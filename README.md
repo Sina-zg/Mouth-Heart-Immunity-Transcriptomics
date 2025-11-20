@@ -303,3 +303,101 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
 BiocManager::install("ComplexHeatmap")
 
 ---------------------------------------------------------------------
+
+Pathway Analysis
+
+# Pathway Analysis: Pseudobulk DESeq2 + GSEA
+
+This script takes single-cell RNA-seq data from NICM and periodontitis (PD) patients, extracts CD4⁺ T cells, aggregates them to **pseudobulk** per sample, runs **DESeq2** differential expression, and performs **GSEA** (Hallmark + GO BP) to compare:
+
+- **PD_HighCTL vs PD_LowCTL**
+- **NICM_Progressor vs NICM_Survivor**
+
+It then generates tables and plots for main and supplementary pathway figures in the manuscript.
+
+---
+
+## What the script does
+
+1. **Project setup**
+   - Sets `PROJECT_DIR` and creates folders: `qc_pngs/`, `results/plots/`, `results/tables/`, `logs/`, `rds/`.
+   - Starts a timestamped log file in `logs/`.
+
+2. **Load samples & basic QC**
+   - Loads 10x RNA matrices for samples:
+     - NICM: `CV5, CV12, CV109, CV110` (Progressors), `CV39, CV87, CV103, CV106` (Survivors)
+     - PD: `PD1–PD4` (HighCTL), `PD5–PD8` (LowCTL)
+   - Computes `percent.mt`, `percent.ribo`, `percent.hb`.
+   - Applies hard + adaptive QC thresholds and saves QC plots to `qc_pngs/`.
+
+3. **Doublet removal & CD4⁺ T-cell gating**
+   - Runs `scDblFinder` to keep only singlets.
+   - Normalizes with `SCTransform` (glmGamPoi).
+   - Gating: keeps CD3D⁺ CD4⁺ CD8A⁻ cells to define CD4⁺ T cells.
+   - Writes QC summary tables to `results/tables/qc_stage*_counts.csv`.
+
+4. **Pseudobulk creation**
+   - For each sample, sums raw RNA counts across gated CD4⁺ T cells.
+   - Builds a gene × sample pseudobulk matrix and metadata (`sample_id`, `group`, `cohort`).
+   - Writes library sizes to `results/tables/pseudobulk_library_sizes.csv`.
+
+5. **Differential expression (DESeq2)**
+   - Builds separate DESeq2 objects for:
+     - PD cohort (`PD_HighCTL` vs `PD_LowCTL`)
+     - NICM cohort (`NICM_Progressor` vs `NICM_Survivor`)
+   - Uses the Wald statistic as ranking metric.
+   - Saves DE tables:
+     - `results/tables/DE_PD_High_vs_Low.csv`
+     - `results/tables/DE_NICM_Prog_vs_Surv.csv`
+
+6. **GSEA: Hallmark + GO BP**
+   - Uses `msigdbr` to collect Hallmark (H) + GO BP (C5) gene sets.
+   - Runs `fgseaMultilevel` for PD and NICM contrasts.
+   - Saves full GSEA results:
+     - `results/tables/GSEA_PD_High_vs_Low__ALL_Hallmark_GO-BP.csv`
+     - `results/tables/GSEA_NICM_Prog_vs_Surv__ALL_Hallmark_GO-BP.csv`
+   - Produces:
+     - Lollipop plots of top enriched pathways per contrast.
+     - NES concordance scatter plot (PD vs NICM).
+
+7. **T-cell–focused pathways and overlap**
+   - Filters PD GSEA results for T cell / cytotoxic / NK-related terms.
+   - Selects top 12 T-cell pathways enriched in PD HighCTL and saves:
+     - `results/tables/PD_Tcell_enriched_in_PDHigh_FULL.csv`
+     - `results/plots/PD_Tcell_TOP12_PDhigh_only_minuslog10FDR.png`
+   - Re-extracts the same 12 pathways for NICM Progressors and builds a 2-condition panel:
+     - `results/plots/PDvsNICM_Tcell_TOP12_WALD.png` / `.svg`
+     - `results/tables/PDvsNICM_Tcell_TOP12_WALD_table.csv`
+
+8. **Supplementary GO BP enrichment plots**
+   - Generates GSEA enrichment curves for key GO BP terms:
+     - Cell activation, lymphocyte/T cell activation, cell killing, leukocyte-mediated cytotoxicity, NK cell–mediated immunity.
+   - Saves them to `results/plots/SUPP_PDHighLow_GO_*.png` and `results/plots/SUPP_PDHigh_vs_Low_GO_*_enrichment.png`.
+
+---
+
+## Inputs you must set
+
+At the top of the script:
+
+- `PROJECT_DIR <- "Path to project"`  
+- `rna_base    <- "Path to RNA Path"`
+
+`rna_base` must point to folders like:
+
+- `sample_filtered_feature_bc_matrix_CV5/`
+- `sample_filtered_feature_bc_matrix_PD1/`
+- etc.
+
+---
+
+## How to run
+
+1. Install required R packages (`Seurat`, `SingleCellExperiment`, `scDblFinder`, `glmGamPoi`, `DESeq2`, `fgsea`, `msigdbr`, `dplyr`, `ggplot2`, `readr`, `stringr`, `forcats`, `purrr`).
+2. Edit `PROJECT_DIR` and `rna_base` to match your directory structure.
+3. In R/RStudio:
+
+   ```r
+   setwd(PROJECT_DIR)
+   source("Pathway_Analysis_Pseudobulk_GSEA.R")
+------------------------------------------------------------------------------------------
