@@ -729,3 +729,335 @@ Helper objects such as cell_map and helper functions like fix_contig_cols() must
 The workflow is tuned for CD4⁺ T-cell biology under MYH6 and DUF1002 peptide stimulation; adapting it to other systems may require updating marker genes, conditions, and QC criteria.
 
 -------------------------------------------------------------------------------------------------------------------
+
+Integrated scRNA-seq + scTCR-seq CD4 T-cell Pipeline
+
+This repository contains an end-to-end R workflow for quality control, integration, annotation, and TCR clonality analysis of 10x Genomics CD4⁺ T cells from:
+NICM Progressors vs NICM Survivors
+
+Periodontitis (PD) High-CTL vs PD Low-CTL patients
+
+scRNATCRseq
+
+The pipeline produces:
+
+QC metrics and plots for each sample
+
+An integrated, annotated CD4⁺ T-cell UMAP
+
+Cluster marker tables (top markers per cluster)
+
+Population composition plots (stacked bars) by group
+
+A CD4 CTL “dot plot” comparing Progressor vs PD HighCTL
+
+TCR clonotype calling (TRA+TRB), clone sizes and expansion bins
+
+Clonality barplots and UMAPs colored by clonal expansion
+
+1. Overview of the Workflow
+1.1 Sample definitions
+
+The script works with 16 samples:
+NICM (CV*): CV5, CV12, CV109, CV110 (Progressors) and CV39, CV87, CV103, CV106 (Survivors)
+PD (PD*): PD1, PD2, PD3, PD4 (High CTL) and PD5, PD6, PD7, PD8 (Low CTL)
+
+Each sample is mapped to a clinical group via group_map and to a cohort (NICM vs PD).
+
+scRNATCRseq
+
+2. RNA Pipeline
+2.1 Input RNA data
+
+The script expects 10x Genomics filtered_feature_bc_matrix directories for each sample, organized as:
+rna_base <- "/Path to Samples/"   # EDIT THIS
+rna_path <- function(s) file.path(rna_base, paste0("sample_filtered_feature_bc_matrix_", s))
+You must edit rna_base to point to your data. Each directory should contain:
+
+matrix.mtx.gz
+barcodes.tsv.gz
+features.tsv.gz
+ 
+scRNATCRseq
+
+2.2 Per-sample QC and filtering
+
+For each sample:
+Create Seurat object
+CreateSeuratObject(mtx, project = s, min.features = 100, min.cells = 3)
+Add metadata: sample_id, group, cohort (NICM vs PD). 
+
+Compute QC metrics
+percent.mt (mitochondrial), percent.ribo (ribosomal), percent.hb (hemoglobin) using PercentageFeatureSet. 
+
+QC thresholds
+Keep cells with:
+nFeature_RNA > 500
+nFeature_RNA < 6500
+percent.mt < 10
+
+Adaptive outlier removal
+Use median + k·MAD for:
+nFeature_RNA (k = 4)
+nCount_RNA (k = 4)
+percent.mt capped at 10% (MAD-based but not exceeding 10%)
+
+QC plotting
+plot_qc() produces per-sample PNGs (qc_pngs/<sample>_QC.png) with:
+Violin plots for nFeature_RNA, nCount_RNA, percent.mt
+Scatter plots: nCount vs nFeature, %MT vs nFeature 
+
+QC summary tables
+qc_stage1_counts.csv (raw, after hard filter, after adaptive filter, MT cap used)
+
+2.3 Doublet removal
+Convert each Seurat object to SingleCellExperiment, run scDblFinder() with dbr = 0.04.
+Keep only cells labeled singlet.
+Update QC table to qc_stage_all_counts.csv (includes counts after doublet removal and after downstream gating). 
+
+2.4 SCTransform normalization
+For each singlet-only object, run:
+SCTransform(
+  seu,
+  assay = "RNA",
+  variable.features.n = 3000,
+  vars.to.regress = "percent.mt",
+  method = "glmGamPoi",
+  verbose = FALSE
+)
+Record remaining cells and append to QC table (after_SCT). 
+
+2.5 CD4⁺ T-cell gating
+
+The function gate_cd3d_cd4_drop_cd8a() gates CD4 T cells at the expression level:
+Default assay set to SCT
+Keep cells with:
+CD3D > 1
+CD4 > 1
+CD8A ≤ 1 (or missing)
+
+Results:
+Per-sample CD4-only objects in gated_list
+
+Final QC table qc_stage_all_counts.csv with "after_gate" and "removed_by_gate" columns
+An .rds file containing all QC-clean CD4-only, SCT-normalized objects:
+saveRDS(gated_list, "qc_clean_per_sample_SCT_CD4only.rds")
+ 
+---
+
+## 3. Integration, Clustering, and Annotation
+
+### 3.1 Load QC-clean objects
+
+
+gated_list <- readRDS("Path to qc_clean_per_sample_SCT_CD4only.rds")  # EDIT
+
+3.2 Remove TCR/Ig genes from integration features
+
+For each object:
+Default assay: "SCT"
+Variable features are filtered to remove TCR/IG genes: ^(TR[ABDG]|IG[HKL])
+This keeps integration anchors driven by transcriptional biology rather than clonal identity. 
+
+3.3 SCT integration (RPCA)
+SelectIntegrationFeatures(object.list = gated_list, nfeatures = 3000)
+PrepSCTIntegration(...)
+Run PCA on each object (30 PCs)
+Choose the two largest samples as reference (ref_idx)
+
+FindIntegrationAnchors(..., normalization.method="SCT", reduction="rpca")
+IntegrateData(..., normalization.method="SCT")
+
+3.4 Dimensionality reduction and clustering
+
+On the integrated object:
+RunPCA (30 PCs)
+FindNeighbors using "pca" and dims 1–30 → "pca_snn" graph
+FindClusters at resolution 0.3
+RunUMAP on PCA (dims 1–30)
+The integrated assay used for downstream analyses is "SCT"; mitochondrial % is recomputed if missing. 
+
+3.5 Cluster markers
+
+PrepSCTFindMarkers(integrated)
+FindAllMarkers with:
+only.pos = TRUE
+min.pct = 0.25
+logfc.threshold = 0.25
+Filter out:
+TCR/Ig (TR*, IG*)
+Mitochondrial (^MT-)
+Ribosomal (^RP[SL])
+
+Outputs:
+markers_all_clusters_SCT.csv – all filtered markers
+markers_top20_per_cluster.csv – top 20 (by log2FC) per cluster
+cluster3_top50.csv – detailed markers for cluster 3 (unfiltered logFC threshold, min.pct 0.1) 
+
+3.6 Manual annotation of clusters
+Clusters from pca_snn_res.0.3 are mapped to functional labels:
+0 → CCR4⁺ memory
+1 → Naive/CM
+2 → Th1 EM
+3 → Treg
+4 → CD4 CTL
+5 → Activated memory
+
+
+3.7 Annotated UMAPs
+
+The script generates:
+
+Overall annotated UMAP
+UMAP split by cohort (NICM vs PD)
+UMAP split by group (NICM_Progressor, NICM_Survivor, PD_HighCTL, PD_LowCTL)
+A custom color palette is used for major CD4 subsets (Naive/CM, CCR4+ memory, Th1 EM, Treg, CD4 CTL, Activated memory). 
+
+4. Population Composition Plots
+4.1 PD HighCTL vs PD LowCTL
+
+From integrated@meta.data, filter:
+cohort == "PD"
+group %in% c("PD_HighCTL", "PD_LowCTL")
+Reorder annotation and plot stacked bar proportions of CD4 subsets per group:
+X-axis: CD4 subset (Naive/CM, Th1 EM, CCR4+ memory, Treg, Activated memory, CD4 CTL)
+Fill: PD_HighCTL (red) vs PD_LowCTL (navy)
+Y-axis: fraction of cells
+
+Outputs:
+PD_High_vs_LowCTL_CD4pop_proportions.png
+PD_High_vs_LowCTL_CD4pop_proportions.svg 
+
+4.2 NICM Progressor vs Survivor
+
+Similarly for NICM:
+cohort == "NICM"
+group %in% c("NICM_Progressor", "NICM_Survivor")
+Compute per-cluster proportions and plot as stacked bars:
+NICM_Progressor_vs_Survivor_CD4pop_proportions.png/.svg
+
+5. CD4 CTL Signature: Progressor vs PD HighCTL
+The pipeline focuses on CD4 CTL cells:
+Subset integrated object:
+cd4ctl <- subset(integrated, subset = annotation == "CD4 CTL" &
+                   group %in% c("NICM_Progressor","PD_HighCTL"))
+cd4ctl$plot_group <- recode(cd4ctl$group,
+                            "NICM_Progressor"="Progressor",
+                            "PD_HighCTL"="PD")
+Gene panel (order preserved in plotting):
+gene_order <- c("CD28","ZEB2","TOX","LAG3","PDCD1",
+                "SELL","CD38","GZMA","IL2RA",
+                "CTLA4","CD52","CD69","GZMK","GNLY",
+                "GZMH","GZMM","NKG7","EOMES","IFNG","PRF1","GZMB")
+Compute:
+Average expression per group (AverageExpression)
+% of cells expressing each gene per group
+Row Z-scores of group averages
+Generate a dot plot:
+X-axis: Progressor vs PD
+Y-axis: genes (reversed order for heatmap-like axis)
+Dot size: % cells expressing
+Dot color: Z-scored average expression
+
+Outputs:
+DotPlot_CD4CTL_Progressor_vs_PD_rowZ.png/.svg
+Console print of Pearson r between Progressor and PD mean expressions across this gene set. 
+
+6. TCR Processing and Clonality
+6.1 TCR input
+
+The script expects 10x filtered_contig_annotations_*.csv files:
+tcr_base <- "Path to Samples TCRs"  # EDIT THIS
+tcr_files <- file.path(tcr_base, paste0("filtered_contig_annotations_", samples, ".csv"))
+Each file is read and normalized to standard column names (barcode, chain, cdr3_aa, productive, etc.). Only:
+is_cell == TRUE
+productive == TRUE
+Optionally high_confidence == TRUE and full_length == TRUE are retained. 
+
+6.2 One TRA + one TRB per cell
+For each sample:
+Group by barcode and chain, then keep the top row by umi_count (and reads as tiebreaker).
+Spread to wide format with columns TRA_aa, TRB_aa.
+Require both chains to be present.
+
+Define:
+sample_id = sample name
+sample_barcode = sample_id_barcode
+CTaa = "<TRA_aa>|<TRB_aa>"
+All samples are merged into clono_tbl. 
+
+6.3 Matching TCRs to RNA cells
+The script:
+Parses RNA cell names to extract 10x barcodes and infer sample_id (from prefixes and/or orig.ident/sample metadata).
+Normalizes RNA cell names to "sample_BARCODE-1" format.
+Matches clono_tbl$sample_barcode to colnames(integrated) and attaches:
+CTaa
+TRA_aa / TRB_aa
+clone_size (frequency of CTaa across all cells)
+
+expansion_category (categorical bin of clone_size):
+Singleton (1)
+Small (2–10)
+Medium (11–20)
+Large (>20)
+NA for cells without TCR
+
+6.4 Group and cohort labels
+group and cohort are reconstructed if missing.
+group_simple maps detailed groups to simplified labels:
+NICM_Survivor → Survivor
+NICM_Progressor → Progressor
+PD_HighCTL → PD HighCTL
+PD_LowCTL → PD LowCTL
+The script prints diagnostic tables for cohort, group, group_simple, and expansion_category distribution. 
+
+6.5 Clonality composition barplots
+Using helper functions mk_df_group and mk_df_cluster:
+
+NICM:
+Clonal expansion composition per group (Survivor vs Progressor)
+Clonal expansion per cluster (or annotation), with Progressor vs Survivor facets
+
+PD:
+Clonal expansion composition per group (PD LowCTL vs PD HighCTL)
+Clonal expansion per cluster, faceted by PD group
+Expansion categories are colored with a dedicated palette and plotted as proportional stacked bars (0–100%). PNG + SVG are saved via save_both() into out_dir (Path to Save files — edit this). 
+
+6.6 UMAPs colored by clonal expansion
+For each group_simple in:
+Survivor
+Progressor
+PD LowCTL
+PD HighCTL
+
+the script:
+Subsets the integrated object to that group.
+Builds a data frame with UMAP embeddings, expansion_category, group_simple.
+Removes cells without TCR or with expansion_category == "NA".
+Plots UMAP with points colored by expansion category; axis limits fixed to full-cohort ranges.
+Each UMAP is saved as PNG/SVG, e.g.:
+
+UMAP_Survivor_expansion.png
+UMAP_Progressor_expansion.png
+UMAP_PD_LowCTL_expansion.png
+UMAP_PD_HighCTL_expansion.png 
+
+7. Requirements
+R ≥ 4.1 recommended
+CRAN packages:
+Seurat, dplyr, ggplot2, Matrix, purrr, glmGamPoi, future, scales, tibble, tidyr, plyr
+Bioconductor:
+SingleCellExperiment, scDblFinder
+Suggested:
+svglite (for SVG export)
+
+The script attempts to install missing packages at the top using install.packages() and BiocManager::install().
+
+8. How to Use This Pipeline
+Place the R script in your project directory.
+Edit paths:
+rna_base (RNA matrices)
+tcr_base (TCR contigs)
+Paths for readRDS("...qc_clean_per_sample_SCT_CD4only.rds") and out_dir for saving plots.
+Run the script in R or RStudio.
+-----------------------------------------------------------------------------------------------------------
