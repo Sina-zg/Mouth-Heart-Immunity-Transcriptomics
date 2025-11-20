@@ -1061,3 +1061,12 @@ tcr_base (TCR contigs)
 Paths for readRDS("...qc_clean_per_sample_SCT_CD4only.rds") and out_dir for saving plots.
 Run the script in R or RStudio.
 -----------------------------------------------------------------------------------------------------------
+
+Spatial Transcriptomics – Cell-Type Densities and CD4 CTL Overlay
+This code computes ROI-level cell-type densities (per mm²) and generates a spatial overlay map highlighting cardiomyocytes and CD4⁺ T cells (including expanded CD4 CTLs) from Xenium (or similar) spatial transcriptomics output.
+It is organized into two main blocks:
+Density script – calculates densities of key cell populations per mm².
+Overlay script – generates a cell-level spatial map with cardiomyocytes and CD4 CTL (with expanded CDR3s) overlaid on tissue coordinates.
+1. Input Data
+Both scripts assume the same structure under a per-sample directory:
+base_dir <- "Path to Spatial Transcriptomics File Per Patient"  # <-- EDIT THIS
