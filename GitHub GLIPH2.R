@@ -10,28 +10,28 @@ suppressPackageStartupMessages({
 #----File of TCR Paths for NICM and PD----
 paths <- list(
   PD_High = c(
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD1.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD5.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD6.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD7.csv"
+    "Sample PD1 filtered_contig_annotations path.csv",
+    "Sample PD2 filtered_contig_annotations path.csv",
+    "Sample PD3 filtered_contig_annotations path.csv",
+    "Sample PD4 filtered_contig_annotations path.csv"
   ),
   PD_Low = c(
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD2.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD3.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD4.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_PD8.csv"
+    "Sample PD5 filtered_contig_annotations path.csv",
+    "Sample PD6 filtered_contig_annotations path.csv",
+    "Sample PD7 filtered_contig_annotations path.csv",
+    "Sample PD8 filtered_contig_annotations path.csv"
   ),
   Prog = c(
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV5.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV12.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV109.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV110.csv"
+    "Sample NICM1 filtered_contig_annotations path.csv",
+    "Sample NICM2 filtered_contig_annotations path.csv",
+    "Sample NICM3 filtered_contig_annotations path.csv",
+    "Sample NICM4 filtered_contig_annotations path.csv"
   ),
   Surv = c(
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV39.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV87.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV103.csv",
-    "/Users/sina_zg/Desktop/Sina_air/Sequencing Analysis/filtered_contig_annotations_CV106.csv"
+    "Sample NICM5 filtered_contig_annotations path.csv",
+    "Sample NICM6 filtered_contig_annotations path.csv",
+    "Sample NICM7 filtered_contig_annotations path.csv",
+    "Sample NICM8 filtered_contig_annotations path.csv"
   )
 )
 
@@ -206,7 +206,7 @@ cat("\nWrote:\n",
 
 
 #----Saving & Running GLIPH2----
-desktop_outdir <- file.path(path.expand("~/Desktop"), "GLIPH2_inputs")
+desktop_outdir <- file.path(path.expand("Path"), "GLIPH2_inputs")
 dir.create(desktop_outdir, showWarnings = FALSE, recursive = TRUE)
 
 run1      <- gliph2_ready %>% dplyr::filter(grepl(":(Prog|PD_High)$", `Subject:condition`))
@@ -217,7 +217,7 @@ readr::write_tsv(run1,      file.path(desktop_outdir, "GLIPH2_Prog_vs_PDHigh.txt
 readr::write_tsv(run2,      file.path(desktop_outdir, "GLIPH2_Surv_vs_PDLow.txt"))
 readr::write_tsv(all_in_one,file.path(desktop_outdir, "GLIPH2_all.txt"))
 
-cat("Wrote to Desktop/GLIPH2_inputs:\n",
+cat("Wrote to GLIPH2_inputs:\n",
     file.path(desktop_outdir, "GLIPH2_Prog_vs_PDHigh.txt"), "\n",
     file.path(desktop_outdir, "GLIPH2_Surv_vs_PDLow.txt"), "\n",
     file.path(desktop_outdir, "GLIPH2_all.txt"), "\n")
@@ -228,7 +228,7 @@ cat("Wrote to Desktop/GLIPH2_inputs:\n",
 #----Export GLIPH2 and Motif Analysis----
 library(readr); library(dplyr); library(stringr)
 
-run1_file <- "~/Desktop/GLIPH2_inputs/gliph2_run1.csv"  
+run1_file <- "Path to gliph2_run1.csv"  
 x1 <- read_csv(run1_file, show_col_types = FALSE)
 
 #----Safety---
@@ -255,18 +255,18 @@ m1 <- x1 %>%
 #----keep motifs present in ≥2 PD  AND ≥2 Progressor----
 m1_kept <- m1 %>% filter(PD >= 2, CV >= 2)
 
-cat("Run1 (Prog + PD High): motifs with ≥2 PD donors AND ≥2 Progressor donors = ",
+cat("Run1 (Prog + PD High): motifs with ≥2 PD AND ≥2 Progressor = ",
     nrow(m1_kept), "\n", sep = "")
 
 
-out1 <- "~/Desktop/GLIPH2_results/run1_motifs_PD>=2_AND_Prog>=2.csv"
+out1 <- "Path to GLIPH2_results/run1_motifs_PD>=2_AND_Prog>=2.csv"
 dir.create(dirname(out1), showWarnings = FALSE, recursive = TRUE)
 readr::write_csv(m1_kept %>% arrange(desc(PD + CV)), out1)
 cat("Saved details to: ", out1, "\n", sep = "")
 
 
 #----Survivor vs Progressors----
-run2_file <- "~/Desktop/GLIPH2_inputs/gliph2_run2.csv"  
+run2_file <- "Path to gliph2_run2.csv"  
 x2 <- read_csv(run2_file, show_col_types = FALSE)
 
 stopifnot(all(c("pattern","Sample") %in% names(x2)))
@@ -294,14 +294,14 @@ m2_kept <- m2 %>% filter(PD >= 2, CV >= 2)
 cat("Run2 (Survivor + PD Low): motifs with ≥2 PD donors AND ≥2 Survivor donors = ",
     nrow(m2_kept), "\n", sep = "")
 
-out2 <- "~/Desktop/GLIPH2_results/run2_motifs_PD>=2_AND_Surv>=2.csv"
+out2 <- "Path to run2_motifs_PD>=2_AND_Surv>=2.csv"
 dir.create(dirname(out2), showWarnings = FALSE, recursive = TRUE)
 readr::write_csv(m2_kept %>% arrange(desc(PD + CV)), out2)
 cat("Saved details to: ", out2, "\n", sep = "")
 
 suppressPackageStartupMessages({library(dplyr); library(readr)})
 
-res_dir <- "~/Desktop/GLIPH2_results"
+res_dir <- "Path to GLIPH2_results"
 run1_csv <- file.path(res_dir, "run1_motifs_PD>=2_AND_Prog>=2.csv")
 run2_csv <- file.path(res_dir, "run2_motifs_PD>=2_AND_Surv>=2.csv")
 
@@ -340,9 +340,9 @@ cat("\nSaved lists to:\n", res_dir, "\n")
 
 
 #----Inputs----
-run3_file <- "~/Desktop/GLIPH2_inputs/gliph2_run3.csv"    
-res_dir   <- "~/Desktop/GLIPH2_results"
-fig_dir   <- "~/Desktop/GLIPH2_figures"; dir.create(fig_dir, FALSE, TRUE)
+run3_file <- "Path to gliph2_run3.csv"    
+res_dir   <- "Path to GLIPH2_results"
+fig_dir   <- "Path to figures"; dir.create(fig_dir, FALSE, TRUE)
 
 #----Load Motifs----
 if (!exists("m1_kept")) m1_kept <- read_csv(file.path(res_dir, "run1_motifs_PD>=2_AND_Prog>=2.csv"), show_col_types = FALSE)
@@ -400,9 +400,9 @@ cat("Run2 kept after scores: ", nrow(m2_kept), " motifs\n", sep = "")
 
 #----Saving----
 readr::write_csv(m1_kept %>% dplyr::arrange(Fisher_Score, Length_Score),
-                 "~/Desktop/GLIPH2_results/run1_motifs_PD>=2_AND_Prog>=2_scores<0.05.csv")
+                 "Path to GLIPH2_results/run1_motifs_PD>=2_AND_Prog>=2_scores<0.05.csv")
 readr::write_csv(m2_kept %>% dplyr::arrange(Fisher_Score, Length_Score),
-                 "~/Desktop/GLIPH2_results/run2_motifs_PD>=2_AND_Surv>=2_scores<0.05.csv")
+                 "Path to GLIPH2_results/run2_motifs_PD>=2_AND_Surv>=2_scores<0.05.csv")
 
 
 s1 <- unique(m1_kept$pattern)  
@@ -567,7 +567,7 @@ mk_panel <- function(df, panel_name, show_x = FALSE, y_lab = NULL) {
                linetype = 2, linewidth = 0.3)
 }
 
-# Rebuild and save
+
 p1 <- mk_panel(plot_freq, "Progressor",   show_x = FALSE, y_lab = "Clone frequency (pseudo-log2)")
 p2 <- mk_panel(plot_freq, "PD High CTL",  show_x = FALSE)
 p3 <- mk_panel(plot_freq, "PD Low CTL",   show_x = FALSE)
@@ -662,17 +662,6 @@ final_with_heat <- (p_heat_g1 / p_heat_g2_noleg) / (p1 / p2 / p3 / p4) +
   plot_layout(heights = c(0.9, 0.9, 4), guides = "collect")
 
 fig_dir <- "~/Desktop/GLIPH2_figures"; dir.create(fig_dir, FALSE, TRUE)
-outfile <- file.path(fig_dir, "GLIPH2_heatmaps_on_top_of_4layers_NO_MASK_right20.png")
+outfile <- file.path(fig_dir, "GLIPH2_heatmaps.png")
 ggsave(outfile, final_with_heat, width = 22, height = 14, dpi = 600, bg = "white")
 cat("Saved:", outfile, "\n")
-
-
-
-
-
-
-
-
-
-
-
