@@ -24,7 +24,7 @@ group_map <- c(
   PD1="PD_HighCTL", PD5="PD_HighCTL", PD6="PD_HighCTL", PD7="PD_HighCTL",
   PD2="PD_LowCTL",  PD3="PD_LowCTL",  PD4="PD_LowCTL",  PD8="PD_LowCTL"
 )
-rna_base <- "/Users/sina_zg/Desktop/Sina_Air/Matrix"
+rna_base <- "/Path to Samples/"
 rna_path <- function(s) file.path(rna_base, paste0("sample_filtered_feature_bc_matrix_", s))
 stopifnot(all(dir.exists(vapply(samples, rna_path, character(1)))))
 
@@ -56,7 +56,7 @@ for (s in samples) {
   seu[["percent.hb"]] <- PercentageFeatureSet(seu, pattern="^HB[AB]")
   
   raw <- ncol(seu)
-  # your hard caps
+  
   hard_keep <- with(seu@meta.data,
                     (nFeature_RNA > 500) & (nFeature_RNA < 6500) & (percent.mt < 10))
   seu <- subset(seu, cells = rownames(seu@meta.data)[hard_keep])
@@ -134,7 +134,7 @@ suppressPackageStartupMessages({ library(Seurat); library(dplyr); library(ggplot
 library(future); plan(sequential); set.seed(1234)
 
 #----Load samples after QC----
-gated_list <- readRDS("/Users/sina_zg/qc_clean_per_sample_SCT_CD4only.rds")
+gated_list <- readRDS("Path to qc_clean_per_sample_SCT_CD4only.rds")
 
 #----Keep anchors biology-driven----
 gated_list <- lapply(gated_list, function(x){
@@ -482,7 +482,7 @@ suppressPackageStartupMessages({
 })
 
 #----Loading TCR Contigs----
-tcr_base  <- "/Users/sina_zg/Desktop/Sina_Air/Sequencing Analysis"
+tcr_base  <- "Path to Samples TCRs"
 samples   <- c("CV5","CV12","CV109","CV110","CV39","CV87","CV103","CV106",
                "PD1","PD5","PD6","PD7","PD2","PD3","PD4","PD8")
 group_map <- c(
@@ -515,7 +515,7 @@ if (all(grepl("_[0-9]+$", old)) && all(!is.na(extract_10x(sub("_[0-9]+$", "", ol
 ok_bc <- !is.na(extract_10x(raw_bc))
 if (!all(ok_bc)) {
   ex <- head(old[!ok_bc], 10)
-  stop("❌ Could not parse 10x barcodes from RNA colnames for ", sum(!ok_bc),
+  stop("Could not parse 10x barcodes from RNA colnames for ", sum(!ok_bc),
        " cells.\nExamples: ", paste(ex, collapse=" | "),
        "\nAdjust the parsing rules and re-run.")
 }
@@ -607,9 +607,9 @@ if (any(is.na(sample_id))) {
 
 if (anyNA(sample_id)) {
   ex <- head(old[is.na(sample_id)], 10)
-  stop("❌ Could not determine sample_id for ", sum(is.na(sample_id)),
+  stop("Could not determine sample_id for ", sum(is.na(sample_id)),
        " cells.\nExamples: ", paste(ex, collapse=" | "),
-       "\nTip: ensure 'orig.ident' is present or supply a reliable sample column.")
+       "\ensure 'orig.ident' is present ")
 }
 
 canon <- paste0(sample_id, "_", raw_bc)
@@ -623,14 +623,14 @@ if (length(du)) {
                         raw_bc = raw_bc[where],
                         canon = canon[where])
   print(diag_df, row.names = FALSE)
-  stop("❌ Canonical names not unique. Two cells share the SAME (sample, barcode). Fix sample_id and retry.")
+  stop("Canonical names not unique")
 }
 
 #----Apply rename----
 if (!all(colnames(integrated) == canon)) {
   integrated <- Seurat::RenameCells(integrated, new.names = canon)
 }
-message("✓ RNA colnames normalized to 'sample_BARCODE-1'.")
+message("RNA colnames normalized to 'sample_BARCODE-1'.")
 
 #----Add sample/group/cohort----
 integrated$sample_id <- sample_id
@@ -638,7 +638,7 @@ integrated$group  <- unname(group_map[integrated$sample_id])
 integrated$cohort <- ifelse(grepl("^CV", integrated$sample_id), "NICM",
                             ifelse(grepl("^PD", integrated$sample_id), "PD", NA))
 mm <- setdiff(unique(integrated$sample_id), names(group_map))
-if (length(mm)) message("⚠️ sample_id not in group_map: ", paste(mm, collapse=", "))
+if (length(mm)) message("sample_id not in group_map: ", paste(mm, collapse=", "))
 
 #-------JOIN CTaa to Seurat Object------
 
@@ -674,7 +674,7 @@ meta$clone_size[m]         <- clono_tbl$clone_size
 meta$expansion_category[m] <- clono_tbl$expansion_category
 integrated@meta.data <- meta
 
-cat("✓ Attached CTaa to", sum(!is.na(integrated$CTaa)),
+cat("Attached CTaa to", sum(!is.na(integrated$CTaa)),
     "cells out of", ncol(integrated), "total.\n")
 
 #----Audit----
@@ -754,11 +754,9 @@ move_cd4ctl_last <- function(x, ref_levels=NULL) {
   factor(x, levels = levs)
 }
 
-suppressPackageStartupMessages({ library(dplyr); library(tidyr); library(ggplot2); library(rlang) })
-if ("package:plyr" %in% search()) detach("package:plyr", unload = TRUE)  # avoid count() masking
 
 # -----------Exporting---------
-out_dir <- path.expand("~/Desktop/ClonalityPlots")
+out_dir <- path.expand("Path to Save files")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 save_both <- function(plot, base, w=6, h=4.5, dpi=600) {
   png_f <- file.path(out_dir, paste0(base, ".png"))
@@ -775,7 +773,7 @@ meta <- integrated@meta.data
 
 #----Audit Grouping----
 if (!"group" %in% names(meta) || all(is.na(meta$group))) {
-  if (!exists("group_map")) stop("group_map is missing in this session.")
+  if (!exists("group_map")) stop("group_map is missing")
   integrated$group <- unname(group_map[integrated$sample_id])
   meta <- integrated@meta.data
 }
@@ -862,7 +860,7 @@ move_cd4ctl_last <- function(x, ref_levels=NULL) {
 # ----------------- NICM plots -----------------
 nicm_levels <- c("Survivor","Progressor")
 
-#----NICM Barplot per Group no NA----
+#----NICM Barplot per Group NA removed----
 df_group_nicm <- mk_df_group(integrated, "NICM", nicm_levels) %>%
   dplyr::filter(!is.na(expansion_category), as.character(expansion_category) != "NA")
 
@@ -924,7 +922,7 @@ if (nrow(df_cluster_nicm)) {
   print(p_cluster_nicm)
   save_both(p_cluster_nicm, paste0("NICM_clonality_by_", cluster_col), 7, 4.8)
 } else {
-  message("⚠️ No NICM rows for per-cluster plot.")
+  message("No NICM rows per-cluster plot.")
 }
 
 #----PD Barplot per Group no NA----
@@ -968,7 +966,6 @@ if (nrow(df_cluster_pd)) {
   print(p_cluster_pd)
   save_both(p_cluster_pd, paste0("PD_clonality_by_", cluster_col), 7, 4.8)
 }
-
 
 
 # ----------------- UMAP per group -----------------
@@ -1020,7 +1017,7 @@ grps <- grps[grps %in% unique(integrated$group_simple)]
 for (g in grps) {
   obj_g <- subset(integrated, subset = group_simple == g)
   df_g  <- make_umap_df(obj_g)
-  if (!nrow(df_g)) { message("No cells for UMAP after NA removal: ", g); next }
+  if (!nrow(df_g)) { message("No cells for UMAP: ", g); next }
   p <- plot_umap_pretty(df_g, paste0("UMAP — ", g, " (Clonal Expansion)"),
                         pt_size = 3.5, alpha = 0.9, stroke = 0.1,
                         border_col = "black", xlim = xr, ylim = yr)
