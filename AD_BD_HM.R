@@ -153,16 +153,16 @@ buglist <- buglist[, -1] #drop SampleType column
 # Match metadata order to abundance data
 metadata <- metadata[match(rownames(buglist), metadata$Sample), ]
 
-# ---------- Step 2: Normalize to relative abundance ----------
+# ---------- Normalize to relative abundance ----------
 abund_rel <- buglist / rowSums(buglist)
 
 # Write to CSV
 write.csv(abund_rel, file = "/path/to/data/files/abund_rel_species.csv", row.names = T)
 
-# ---------- Step 3: Bray-Curtis distance ----------
+# ---------- Bray-Curtis distance ----------
 bray_dist <- vegdist(abund_rel, method = "bray")
 
-# ---------- Step 4: PCoA ----------
+# ---------- PCoA ----------
 pcoa_res <- cmdscale(bray_dist, eig = TRUE, k = 2)  # k=2 for 2D
 pcoa_df <- as.data.frame(pcoa_res$points)
 colnames(pcoa_df) <- c("PCoA1", "PCoA2")
