@@ -14,18 +14,18 @@ suppressPackageStartupMessages({
 
 #----Path to Matrix----
 rna_paths <- list(
-  CV5_Unstim   = "Path to/sample_filtered_feature_bc_matrix_CV5",
-  CV5_MYH6     = "Path to/sample_filtered_feature_bc_matrix_CV5_MYH6",
-  CV5_DUF1002  = "Path to/sample_filtered_feature_bc_matrix_CV5_DUF1002",
-  CV12_Unstim  = "Path to/sample_filtered_feature_bc_matrix_CV12",
-  CV12_MYH6    = "Path to/sample_filtered_feature_bc_matrix_CV12_MYH6",
-  CV12_DUF1002 = "Path to/sample_filtered_feature_bc_matrix_CV12_DUF1002",
-  CV109_Unstim = "Path to/sample_filtered_feature_bc_matrix_CV109",
-  CV109_MYH6   = "Path to/sample_filtered_feature_bc_matrix_CV109_MYH6",
-  CV109_DUF1002= "Path to/sample_filtered_feature_bc_matrix_CV109_DUF1002",
-  CV110_Unstim = "Path to/sample_filtered_feature_bc_matrix_CV110",
-  CV110_MYH6   = "Path to/sample_filtered_feature_bc_matrix_CV110_MYH6",
-  CV110_DUF1002= "Path to/sample_filtered_feature_bc_matrix_CV110_DUF1002"
+  CV5_Unstim   = "Path to sample1 unstim",
+  CV5_MYH6     = "Path to sample1 MYH6",
+  CV5_DUF1002  = "Path to sample1 DUF1002",
+  CV12_Unstim  = "Path to sample2 unstim",
+  CV12_MYH6    = "Path to sample2 MYH6",
+  CV12_DUF1002 = "Path to sample2 DUF1002",
+  CV109_Unstim = "Path to sample3 unstim",
+  CV109_MYH6   = "Path to sample3 MYH6",
+  CV109_DUF1002= "Path to sample3 DUF1002",
+  CV110_Unstim = "Path to sample4 unstim",
+  CV110_MYH6   = "Path to sample4 MYH6",
+  CV110_DUF1002= "Path to sample4 DUF1002"
 )
 
 #----Seurat Object Per Sample----
@@ -83,18 +83,18 @@ seu <- FindClusters(seu, resolution = 0.6)
 
 #----Path to TCR Congis----
 contig_paths <- list(
-  CV5_Unstim   = "Path to/filtered_contig_annotations_CV5.csv",
-  CV5_MYH6     = "Path to/filtered_contig_annotations_CV5_MYH6.csv",
-  CV5_DUF1002  = "Path to/filtered_contig_annotations_CV5_DUF1002.csv",
-  CV12_Unstim  = "Path to/filtered_contig_annotations_CV12.csv",
-  CV12_MYH6    = "Path to/filtered_contig_annotations_CV12_MYH6.csv",
-  CV12_DUF1002 = "Path to/filtered_contig_annotations_CV12_DUF1002.csv",
-  CV109_Unstim = "Path to/filtered_contig_annotations_CV109.csv",
-  CV109_MYH6   = "Path to/filtered_contig_annotations_CV109_MYH6.csv",
-  CV109_DUF1002= "Path to/filtered_contig_annotations_CV109_DUF1002.csv",
-  CV110_Unstim = "Path to/filtered_contig_annotations_CV110.csv",
-  CV110_MYH6   = "Path to/filtered_contig_annotations_CV110_MYH6.csv",
-  CV110_DUF1002= "Path to/filtered_contig_annotations_CV110_DUF1002.csv"
+  CV5_Unstim   = "Path to contig sample 1 unstim.csv",
+  CV5_MYH6     = "Path to contig sample 1 MYH6.csv",
+  CV5_DUF1002  = "Path to contig sample 1 DUF1002.csv",
+  CV12_Unstim  = "Path to contig sample 2 unstim.csv",
+  CV12_MYH6    = "Path to contig sample 2 MYH6.csv",
+  CV12_DUF1002 = "Path to contig sample 2 DUF1002.csv",
+  CV109_Unstim = "Path to contig sample 3 unstim.csv",
+  CV109_MYH6   = "Path to contig sample 3 MYH6.csv",
+  CV109_DUF1002= "Path to contig sample 3 DUF1002.csv",
+  CV110_Unstim = "Path to contig sample 4 unstim.csv",
+  CV110_MYH6   = "Path to contig sample 4 MYH6.csv",
+  CV110_DUF1002= "Path to contig sample 4 DUF1002.csv"
 )
 
 contigs_raw <- lapply(contig_paths, read.csv, stringsAsFactors = FALSE)
@@ -198,9 +198,9 @@ print(summary_tbl)
 cat("\n# Sanity verdict:\n")
 if (length(missing_in_TCR)==0 && length(extra_in_TCR)==0 &&
     all(summary_tbl$match_cells > 0) && all(summary_tbl$seu_cells > 0)) {
-  cat("✔ All expected samples are present, barcodes align, and every sample has mapped TCRs.\n")
+  cat("All expected samples are present, barcodes align, and every sample has mapped TCRs.\n")
 } else {
-  cat("⚠ Something is off — see tables above (missing/extra samples or zero matches).\n")
+  cat("wrong.\n")
 }
 
 
@@ -368,8 +368,8 @@ p_alluvial <- ggplot(
   guides(fill = guide_legend(title = "Clones"))
 
 p_alluvial
-ggsave("Path to Save/TCR_alluvial_plot_pooled_FIXEDTRB.png", p_alluvial, width = 18, height = 8, dpi = 600)
-ggsave("/Path to Save/TCR_alluvial_plot_pooled_FIXEDTRB.pdf", p_alluvial, width = 18, height = 8, dpi = 600)
+ggsave("Path to Save/TCR_alluvial_plot.png", p_alluvial, width = 18, height = 8, dpi = 600)
+ggsave("/Path to Save/TCR_alluvial_plot.pdf", p_alluvial, width = 18, height = 8, dpi = 600)
 
 
 #--------UMAP Projection for Expanded Cells--------
@@ -543,12 +543,12 @@ p_myh6   <- plot_one("MYH6")
 p_duf    <- plot_one("DUF1002")
 
 p_unstim; p_myh6; p_duf
-ggsave("UMAP_CD4_27clones_Unstim_withN.png",  p_unstim, width=5.5, height=5, dpi=600)
-ggsave("UMAP_CD4_27clones_MYH6_withN.png",    p_myh6,   width=5.5, height=5, dpi=600)
-ggsave("UMAP_CD4_27clones_DUF1002_withN.png", p_duf,    width=5.5, height=5, dpi=600)
-ggsave("UMAP_CD4_27clones_Unstim_withN.pdf",  p_unstim, width=5.5, height=5, dpi=600)
-ggsave("UMAP_CD4_27clones_MYH6_withN.pdf",    p_myh6,   width=5.5, height=5, dpi=600)
-ggsave("UMAP_CD4_27clones_DUF1002_withN.pdf", p_duf,    width=5.5, height=5, dpi=600)
+ggsave("UMAP_CD4_27clones_Unstim.png",  p_unstim, width=5.5, height=5, dpi=600)
+ggsave("UMAP_CD4_27clones_MYH6.png",    p_myh6,   width=5.5, height=5, dpi=600)
+ggsave("UMAP_CD4_27clones_DUF1002.png", p_duf,    width=5.5, height=5, dpi=600)
+ggsave("UMAP_CD4_27clones_Unstim.pdf",  p_unstim, width=5.5, height=5, dpi=600)
+ggsave("UMAP_CD4_27clones_MYH6.pdf",    p_myh6,   width=5.5, height=5, dpi=600)
+ggsave("UMAP_CD4_27clones_DUF1002.pdf", p_duf,    width=5.5, height=5, dpi=600)
 
 
 
@@ -855,7 +855,7 @@ seu_27 <- tryCatch({
 
 rna_layers <- tryCatch(Layers(seu_27[["RNA"]]), error = function(e) character(0))
 if (!"data" %in% rna_layers) {
-  message("Normalizing RNA (LogNormalize) to create 'data' layer...")
+  message("Normalizing RNA (LogNormalize) to create 'data' layer")
   seu_27 <- NormalizeData(seu_27, assay = "RNA",
                           normalization.method = "LogNormalize",
                           scale.factor = 1e4, verbose = FALSE)
