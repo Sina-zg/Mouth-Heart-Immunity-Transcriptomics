@@ -1,6 +1,6 @@
 
 #----Project Direction----
-PROJECT_DIR <- "Users/sina_zg/Desktopprojects/PD_pathway_master"
+PROJECT_DIR <- "Path to project"
 dirs <- file.path(PROJECT_DIR, c("qc_pngs","results/plots","results/tables","logs","rds"))
 invisible(lapply(dirs, dir.create, recursive = TRUE, showWarnings = FALSE))
 setwd(PROJECT_DIR)
@@ -20,14 +20,14 @@ set.seed(1234)
 
 #----Sample Loading----
 samples <- c("CV5","CV12","CV109","CV110","CV39","CV87","CV103","CV106",
-             "PD1","PD5","PD6","PD7","PD2","PD3","PD4","PD8")
+             "PD1","PD2","PD3","PD4","PD5","PD6","PD7","PD8")
 group_map <- c(
   CV5="NICM_Progressor", CV12="NICM_Progressor", CV109="NICM_Progressor", CV110="NICM_Progressor",
   CV39="NICM_Survivor",  CV87="NICM_Survivor",  CV103="NICM_Survivor",  CV106="NICM_Survivor",
-  PD1="PD_HighCTL", PD5="PD_HighCTL", PD6="PD_HighCTL", PD7="PD_HighCTL",
-  PD2="PD_LowCTL",  PD3="PD_LowCTL",  PD4="PD_LowCTL",  PD8="PD_LowCTL"
+  PD1="PD_HighCTL", PD2="PD_HighCTL", PD3="PD_HighCTL", PD4="PD_HighCTL",
+  PD5="PD_LowCTL",  PD6="PD_LowCTL",  PD7="PD_LowCTL",  PD8="PD_LowCTL"
 )
-rna_base <- "/Users/sina_zg/Desktop/Sina_Air/Matrix"
+rna_base <- "Path to RNA Path"
 rna_path <- function(s) file.path(rna_base, paste0("sample_filtered_feature_bc_matrix_", s))
 stopifnot(all(dir.exists(vapply(samples, rna_path, character(1)))))
 
@@ -269,7 +269,7 @@ stopifnot(exists("gated_list"), length(gated_list) > 0)
 pb_parts <- map(gated_list, pb_one)
 pb_parts <- compact(pb_parts)  
 
-if (length(pb_parts) == 0) stop("All samples empty after gating. Aborting.")
+if (length(pb_parts) == 0) stop("All samples empty.")
 
 all_genes   <- Reduce(union, map(pb_parts, ~ rownames(.x$counts)))
 all_samples <- unlist(map(pb_parts, ~ colnames(.x$counts)))
@@ -430,7 +430,7 @@ make_dds_pd <- function(pb){
     arrange(sample_id)
   cts  <- pb$counts[, colnames(pb$counts) %in% meta$sample_id, drop = FALSE]
   
-  # sanity: samples present
+  #--sanity--
   cat("PD samples — counts cols:", ncol(cts), " meta rows:", nrow(meta), "\n")
   if (nrow(meta) < 2 || ncol(cts) < 2) stop("Need >=2 PD samples per contrast.")
   
