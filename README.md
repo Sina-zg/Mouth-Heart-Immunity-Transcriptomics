@@ -192,3 +192,114 @@ How to Run the Script
 
 5.	All plots and results will appear in your output directories.
 
+----------------------------------------------------------------------
+
+# Complex Heatmap
+
+This script generates a **publication-ready ComplexHeatmap** showing gene expression and TCR clonal features for CD4⁺ T cells from NICM patients, comparing **Progressor** vs **Survivor** groups.
+
+Each column is a single CD4⁺ T cell.  
+Each row is a gene of interest.  
+Top annotations summarize sample group, patient ID, TCR clone size, and QC metrics.
+
+---
+
+## What this script does
+
+1. **Loads per-patient 10x Genomics RNA data**  
+   - Uses `Read10X()` and `CreateSeuratObject()` for each patient in `sample_info`.
+   - Annotates each cell with `sample_id` and `group` (Progressor/Survivor).
+
+2. **Performs basic QC and normalization**
+   - Computes mitochondrial percentage (`percent.mt`).
+   - Keeps cells with:
+     - `nFeature_RNA > 500`
+     - `nFeature_RNA < 6500`
+     - `percent.mt < 10`
+   - Normalizes RNA counts with `NormalizeData()`.
+
+3. **Merges all patients into a single Seurat object**
+   - Merges count matrices and metadata across samples.
+   - Creates `seurat_combined_clean` containing all QC-passing cells.
+   - Renormalizes after merging.
+
+4. **Loads and processes TCR data**
+   - Reads `filtered_contig_annotations_<sample>.csv` per patient.
+   - Keeps only **productive** TCRs (`productive == "true"`).
+   - Constructs a unique cell barcode that matches RNA data: `sampleID_barcode`.
+   - Defines clones using CDR3 amino acid sequence (`CTaa = cdr3`).
+   - Computes clone size (`clone_size` = number of cells per CTaa).
+   - Categorizes clones into:
+     - `Singleton` (clone_size == 1 or missing)
+     - `Small`     (2–10)
+     - `Medium`    (11–20)
+     - `Large`     (>20)
+   - Adds `clone_category` and `tcr_freq` (clone size) to Seurat metadata.
+
+5. **Restricts to CD4⁺ T cells**
+   - Keeps cells with `CD3D > 0` **and** `CD4 > 0`.
+
+6. **Selects and scales genes of interest**
+   - Uses a predefined list of genes (naïve, activation, cytotoxicity, exhaustion, γδ, CD8, etc.).
+   - Keeps only genes present in the RNA assay.
+   - Scales these genes using `ScaleData()` and extracts the Z-score matrix from `scale.data`.
+
+7. **Builds the annotation metadata for the heatmap**
+   - For each cell (column) the script constructs:
+     - `Group` (Progressor / Survivor)
+     - `Patient` (sample_id)
+     - `CloneSize` (Singleton / Small / Medium / Large)
+     - `Mito %` (percent.mt)
+     - `Read count` (nCount_RNA)
+     - `# of features` (nFeature_RNA)
+     - `TCR frequency` (clone size)
+
+8. **Orders cells for visualization**
+   - Columns are sorted by:
+     1. `Group`
+     2. `CloneSize` (Large → Medium → Small → Singleton)
+     3. `TCR frequency` (descending)
+     4. `Patient`
+
+9. **Builds the ComplexHeatmap**
+   - Rows: genes of interest (order fixed, no clustering).
+   - Columns: individual cells.
+   - Column split by `Group` (Progressor vs Survivor).
+   - Top annotation includes:
+     - Group
+     - Patient
+     - CloneSize
+     - Mito %
+     - Read count
+     - # of features
+     - TCR frequency
+   - Expression values are shown as scaled Z-scores.
+
+10. **Exports the heatmap**
+    - High-resolution PNG.
+    - Vector PDF.
+
+---
+
+## Required R packages
+
+The script uses:
+
+- `Seurat`
+- `dplyr`
+- `ComplexHeatmap`
+- `circlize`
+- `grid`
+
+Make sure these are installed, for example:
+
+```r
+install.packages(c("Seurat", "dplyr"))
+install.packages("circlize")
+install.packages("grid")  # usually comes with base R
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install("ComplexHeatmap")
+
+---------------------------------------------------------------------
