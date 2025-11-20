@@ -401,3 +401,106 @@ At the top of the script:
    setwd(PROJECT_DIR)
    source("Pathway_Analysis_Pseudobulk_GSEA.R")
 ------------------------------------------------------------------------------------------
+
+GLIPH2 Analysis
+
+# GLIPH2 Analysis: Clonotype Preparation, Motif Filtering, and Visualization
+
+This script prepares TCR β–chain clonotype tables for **GLIPH2**, filters GLIPH2 motif outputs with patient- and score-based criteria, and generates publication-ready figures showing motif sharing across **PD HighCTL / PD LowCTL** and **NICM Progressor / Survivor** groups.
+
+---
+
+## Inputs (edit these paths)
+
+- 10x `filtered_contig_annotations` CSV files for each sample:
+
+  ```r
+  paths <- list(
+    PD_High = c("Sample PD1 filtered_contig_annotations path.csv", ...),
+    PD_Low  = c("Sample PD5 filtered_contig_annotations path.csv", ...),
+    Prog    = c("Sample NICM1 filtered_contig_annotations path.csv", ...),
+    Surv    = c("Sample NICM5 filtered_contig_annotations path.csv", ...)
+  )
+
+GLIPH2 result files (one row per motif/pattern):
+run1_file <- "Path to gliph2_run1.csv"   # Prog + PD High
+run2_file <- "Path to gliph2_run2.csv"   # Surv + PD Low
+run3_file <- "Path to gliph2_run3.csv"   # (all samples, for some plots)
+res_dir   <- "Path to GLIPH2_results"
+fig_dir   <- "Path to figures"
+
+
+What the script does
+
+Load and standardize contig files
+
+Reads all filtered_contig_annotations_*.csv files for PD_High, PD_Low, Prog, Surv.
+Standardizes column names to a 10x-like schema (barcode, chain, cdr3_aa, v_gene, j_gene, productive, reads, umis).
+Filters to productive chains only.
+
+Resolve one TRA and one TRB per cell
+Within each (sample_id, condition, barcode, chain) group, selects the contig with highest UMI/read support.
+
+Keeps only TRA/TRB and pivots to one row per cell with:
+CDR3a, CDR3b, Va, Ja, Vb, Jb (alleles stripped to gene family).
+
+Build clonotype table and GLIPH2 inputs
+
+Motif-level postprocessing of GLIPH2 runs
+
+Loads GLIPH2 outputs (gliph2_run1.csv, gliph2_run2.csv), requiring at least:
+pattern (motif), Sample (donor ID), Fisher_Score, Length_Score (for later filtering; names auto-detected)
+
+Classifies each Sample as:
+PD (periodontitis, PD1–PD8)
+CV (cardiac/NICM, CV samples)
+
+For each run, counts how many distinct donors contribute each motif in PD and CV, and keeps motifs:
+Present in ≥ 2 PD donors and ≥ 2 CV donors
+With Fisher_Score < 0.05 and Length_Score < 0.05
+
+Writes filtered motif tables to res_dir, e.g.:
+run1_motifs_PDHigh>=2_AND_Prog>=2_scores<0.05.csv
+run2_motifs_PDLow>=2_AND_Surv>=2_scores<0.05.csv
+
+Motif overlap between groups
+Defines two motif sets:
+Group1 (Prog + PD High) from run1
+Group2 (Surv + PD Low) from run2
+
+Computes:
+motifs unique to Group1
+motifs unique to Group2
+motifs shared between both
+
+Saves lists in res_dir as:
+motifs_unique_to_Group1.txt
+motifs_unique_to_Group2.txt
+motifs_shared_Group1_and_Group2.txt
+
+Frequency-based motif plots (4-layer bar figure)
+Converts GLIPH2 run1/run2 outputs into a unified table with:
+Subject (donor), condition (Prog / Surv / PD_High / PD_Low), pattern, Frequency
+
+Maps conditions to panels:
+Progressor, PD High CTL, PD Low CTL, Survivor
+
+Selects ordered motif patterns:
+Left block: motifs enriched in Group1 only
+Middle block: shared motifs
+Right block: motifs enriched in Group2 only
+Builds a 4-row bar plot (pseudo-log2 Y axis) for:
+Progressor, PD High CTL, PD Low CTL, Survivor
+
+Saves:
+GLIPH2_4layers_FreqLOG2_noTitles.png in fig_dir.
+Motif × donor heatmaps
+Constructs a donor-level matrix: number of TCRs per (Subject, pattern) for:
+Group1 (Progressor + PD High CTL)
+Group2 (PD Low CTL + Survivor)
+Fills missing combinations with zero and caps fill at 4 TCRs for visualization.
+Creates two stacked heatmaps (Group1, Group2) aligned to the same motif order, with vertical dashed lines marking the three motif blocks (Group1-only / shared / Group2-only).
+Combines heatmaps + 4-layer bar panels using patchwork and saves:
+GLIPH2_heatmaps.png in fig_dir.
+
+-------------------------------------------------------------------------------------
