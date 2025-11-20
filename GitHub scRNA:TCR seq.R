@@ -17,12 +17,12 @@ set.seed(1234)
 
 # ---- Samples & paths ----
 samples <- c("CV5","CV12","CV109","CV110","CV39","CV87","CV103","CV106",
-             "PD1","PD5","PD6","PD7","PD2","PD3","PD4","PD8")
+             "PD1","PD2","PD3","PD4","PD5","PD6","PD7","PD8")
 group_map <- c(
   CV5="NICM_Progressor", CV12="NICM_Progressor", CV109="NICM_Progressor", CV110="NICM_Progressor",
   CV39="NICM_Survivor",  CV87="NICM_Survivor",  CV103="NICM_Survivor",  CV106="NICM_Survivor",
-  PD1="PD_HighCTL", PD5="PD_HighCTL", PD6="PD_HighCTL", PD7="PD_HighCTL",
-  PD2="PD_LowCTL",  PD3="PD_LowCTL",  PD4="PD_LowCTL",  PD8="PD_LowCTL"
+  PD1="PD_HighCTL", PD2="PD_HighCTL", PD3="PD_HighCTL", PD4="PD_HighCTL",
+  PD5="PD_LowCTL",  PD6="PD_LowCTL",  PD7="PD_LowCTL",  PD8="PD_LowCTL"
 )
 rna_base <- "/Path to Samples/"
 rna_path <- function(s) file.path(rna_base, paste0("sample_filtered_feature_bc_matrix_", s))
