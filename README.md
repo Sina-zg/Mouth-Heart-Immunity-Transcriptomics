@@ -1063,10 +1063,274 @@ Run the script in R or RStudio.
 -----------------------------------------------------------------------------------------------------------
 
 Spatial Transcriptomics – Cell-Type Densities and CD4 CTL Overlay
+
 This code computes ROI-level cell-type densities (per mm²) and generates a spatial overlay map highlighting cardiomyocytes and CD4⁺ T cells (including expanded CD4 CTLs) from Xenium (or similar) spatial transcriptomics output.
+
 It is organized into two main blocks:
 Density script – calculates densities of key cell populations per mm².
 Overlay script – generates a cell-level spatial map with cardiomyocytes and CD4 CTL (with expanded CDR3s) overlaid on tissue coordinates.
+
 1. Input Data
 Both scripts assume the same structure under a per-sample directory:
 base_dir <- "Path to Spatial Transcriptomics File Per Patient"  # <-- EDIT THIS
+
+Within base_dir, the following files must exist:
+matrix.mtx.gz – sparse gene-by-cell count matrix
+barcodes.tsv.gz – cell IDs
+features.tsv.gz – gene IDs and symbols (gene names in column 2)
+cell_boundaries.parquet – polygon vertices for each cell, with columns:
+cell_id
+vertex_x
+vertex_y
+These are the standard Xenium cell_feature_matrix and cell_boundaries outputs.
+
+2. Dependencies
+Both sections use base R plus the following packages:
+
+suppressPackageStartupMessages({
+  library(Matrix)
+  library(data.table)
+  library(arrow)
+  library(sf)        # for ROI convex hull and area
+  # second block also uses:
+  library(ggplot2)
+})
+
+Install any missing packages with:
+install.packages(c("Matrix", "data.table", "arrow", "sf", "ggplot2"))
+
+3. Part 1 – ROI-Level Cell-Type Densities
+3.1. Loading counts and cell boundaries
+The first block:
+Reads the sparse count matrix:
+counts   <- readMM(file.path(base_dir, "matrix.mtx.gz"))
+barcodes <- fread(file.path(base_dir, "barcodes.tsv.gz"), header = FALSE)$V1
+feats    <- fread(file.path(base_dir, "features.tsv.gz"), header = FALSE)
+rownames(counts) <- feats$V2    # gene symbols
+colnames(counts) <- barcodes    # cell IDs
+
+Reads cell boundaries:
+cell_bounds <- read_parquet(file.path(base_dir, "cell_boundaries.parquet"), as_data_frame = TRUE)
+stopifnot(all(c("cell_id","vertex_x","vertex_y") %in% names(cell_bounds)))
+
+QC alignment:
+Removes cells with zero total transcripts (tot_per_cell >= 1).
+Filters cell_bounds to those cell_ids still present in counts.
+
+3.2. ROI area estimation (mm²)
+The script converts the convex hull of all cell boundary vertices into an ROI area:
+pts  <- st_as_sf(cell_bounds[, c("vertex_x","vertex_y")],
+                 coords = c("vertex_x","vertex_y"))
+hull <- st_convex_hull(st_union(pts))
+roi_area_um2 <- as.numeric(st_area(hull))
+roi_area_mm2 <- roi_area_um2 / 1e6   # µm² → mm²
+
+3.3. Core helper: “presence” definition
+Cell-level marker “presence” is defined as ≥ 1 detected transcript for at least one gene in a set:
+present_any <- function(genes) {
+  sel <- intersect(genes, rownames(counts))
+  if (!length(sel)) return(rep(FALSE, ncol(counts)))
+  Matrix::colSums(counts[sel, , drop = FALSE] > 0) > 0
+}
+
+3.4. Gene panels
+The script defines biologically meaningful gene sets, intersected with avail <- rownames(counts):
+
+T cells / CD3 complex
+cd3_genes <- c("CD3D","CD3E","CD3G","CD247","CD3Z")
+
+Macrophage / myeloid markers
+macrophage_markers <- c("LYZ","C1QA","C1QB","C1QC","MS4A7","CD68","CSF1R","AIF1","CD163","MRC1","MARCO","CCR2","APOE","TREM2")
+
+Cytotoxic CD4 CTL panel
+cyto_genes <- c("GZMB","PRF1","GNLY","NKG7","GZMA","GZMM","GZMH","CCL5","CX3CR1","PLEK","ZEB2")
+
+Expanded TCR V-gene panel
+tcr_panel <- c("TRBV7-9","TRBV28","TRBV6-1","TRBV5-1","TRBV2","TRBV5-4","TRBV19","TRBV24-1","TRAV38-2DV8","TRAV16","TRAV2","TRAV8-4")
+
+Expanded CDR3 probes
+Rows containing "Expanded" in the feature name
+Exclude probes with "." or "strain" (likely microbial/nuisance probes).
+
+Cardiomyocytes & stress
+Base CM: MYH7, MYH6, ACTC1, TNNT2
+Extras (if present): TNNI3, MYL2, MYH7B, TTN, MYL7, RYR2, TNNC1
+Stress markers: NPPA, NPPB
+
+Other compartments
+CD8 T cells: CD8A, CD8B
+B cells: MS4A1, CD79A, CD79B, CD74, CD19, BANK1, IGKC, IGHM
+Myeloid (extended): macrophage markers + ITGAM, S100A8, S100A9
+
+HLA class I/II: HLA-A, HLA-B, HLA-C, HLA-E, HLA-DRA, HLA-DRB1, HLA-DPA1, HLA-DPB1, HLA-DQA1, HLA-DQB1
+Apoptosis: CASP3, CASP7, BAX, BID, FAS, TNFRSF10A, TNFRSF10B, PMAIP1, BBC3, BCL2L11
+Fibrosis: COL1A1, COL1A2, COL3A1, COL5A1, COL6A1, COL6A3, DCN, LUM, FAP, PDGFRA, PDGFRB, TAGLN, ACTA2, SPARC, FN1
+
+3.5. Masks (cell identities)
+Using present_any(), the script defines:
+
+T lineage
+t_mask <- present_any(cd3_genes)
+CD4 T cells
+cd4_mask <- present_any("CD4")
+
+Optional switches (currently FALSE):
+REQUIRE_T_FOR_CD4_CD8 – require CD3 positivity
+EXCLUDE_MACRO_FROM_CD4/EXCLUDE_MACRO_FROM_CD8 – exclude macrophage-like cells
+
+CD4 CTLs
+cd4_ctl <- cd4_mask & present_any(cyto_genes)
+CD4 CTLs with expanded TCR V-gene skew
+ctl_tcr <- cd4_ctl & present_any(tcr_panel)
+CD4 CTLs with expanded CDR3 probes
+ctl_expanded <- cd4_ctl & present_any(expanded_rows)
+CD8 T cells
+cd8_mask <- present_any(cd8_genes)
+B cells, myeloid, HLA+, apoptosis, fibrosis
+b_mask, myeloid_mask, hla_mask, apoptosis_mask, fibrosis_mask
+
+Cardiomyocytes
+cm_mask     <- present_any(cm_markers)
+stressed_cm <- cm_mask & present_any(stress_markers)
+normal_cm   <- cm_mask & (!stressed_cm)
+
+3.6. Densities per mm²
+A small helper converts counts to densities:
+
+dens <- function(n) n / roi_area_mm2
+
+The script then builds a single-row density_report:
+density_report <- data.frame(
+  ROI_area_mm2            = round(roi_area_mm2, 4),
+
+  Normal_CM_per_mm2       = round(dens(sum(normal_cm)), 3),
+  Stressed_CM_per_mm2     = round(dens(sum(stressed_cm)), 3),
+
+  T_per_mm2               = round(dens(sum(t_mask)), 3),
+  CD4_per_mm2             = round(dens(sum(cd4_mask)), 3),
+  CD4_CTL_per_mm2         = round(dens(sum(cd4_ctl)), 3),
+  CD4_CTL_TCR_per_mm2     = round(dens(sum(ctl_tcr)), 3),
+  CD4_CTL_Expanded_per_mm2= round(dens(sum(ctl_expanded)), 3),
+
+  CD8_per_mm2             = round(dens(sum(cd8_mask)), 3),
+  B_per_mm2               = round(dens(sum(b_mask)), 3),
+  Myeloid_per_mm2         = round(dens(sum(myeloid_mask)), 3),
+
+  HLApos_per_mm2          = round(dens(sum(hla_mask)), 3),
+  ApoptosisSig_per_mm2    = round(dens(sum(apoptosis_mask)), 3),
+
+  Fibrosis_like_per_mm2   = round(dens(sum(fibrosis_mask)), 3)
+)
+
+print(density_report)
+
+4. Part 2 – Spatial Cell Overlay Map
+The second block re-loads the same data and produces a spatial map with cell centroids colored by category (cardiomyocytes, CD4 T cells, expanded CD4 CTLs).
+
+4.1. Loading and QC
+This section repeats the basic loading, trimming whitespace from gene symbols (trimws), and filtering:
+Remove zero-transcript cells.
+Keep matching cell_bounds.
+
+A case-insensitive present_any() is defined using uppercased rownames.
+
+4.2. Gene panels and expanded CDR3 probes
+
+It defines:
+Cardiomyocyte markers:
+cm_markers <- c("MYH7","MYH6","ACTC1","TNNT2","TNNI3","MYL2")
+Stress markers: NPPA, NPPB
+
+T-cell and macrophage markers: cd3_genes, macrophage_markers
+Cytotoxic genes (CD4 CTL panel): GZMB, PRF1, GNLY, NKG7, GZMA, GZMM, GZMH, ZEB2, PLEK, CCL5, CX3CR1
+Expanded CDR3 probes are again identified via "Expanded" in rownames(counts), but microbial probes are explicitly excluded by filtering out names containing:
+strains or
+Aggregati, Haemophilus, Streptococcus, Staphylococcus, Fusobacterium, Porphyromonas
+
+4.3. Masks
+Using present_any():
+Cardiomyocytes
+cm_mask, stressed_cm, normal_cm as before.
+T lineage
+T cells are CD3⁺ and non-macrophage:
+t_mask <- present_any(cd3_genes) & (!present_any(macrophage_markers))
+CD4 T cells
+cd4_mask <- present_any("CD4")
+CD4 CTLs
+cd4_ctl <- cd4_mask & present_any(cyto_genes)
+CD4 CTL + Expanded CDR3
+ctl_expanded <- cd4_ctl & present_any(expanded_rows)
+
+Sanity outputs:
+Which markers were found on the panel.
+Counts of each class: normal CM, stressed CM, CD4, CD4 CTL, CD4 CTL + expanded.
+
+4.4. Cell centroids and category assignment
+centroids <- as.data.table(cell_bounds)[, .(
+  x = mean(vertex_x, na.rm = TRUE),
+  y = mean(vertex_y, na.rm = TRUE)
+), by = cell_id]
+
+It then attaches logical flags per cell and assigns a mutually exclusive category:
+flag_df <- data.frame(
+  cell_id = colnames(counts),
+  is_CM_normal    = cm_mask & !stressed_cm,
+  is_CM_stressed  = stressed_cm,
+  is_CD4          = cd4_mask,
+  is_CTL_Expanded = ctl_expanded
+)
+
+plot_df$category <- "Other"
+plot_df$category[plot_df$is_CM_normal]    <- "CM_normal"
+plot_df$category[plot_df$is_CM_stressed]  <- "CM_stressed"
+plot_df$category[plot_df$is_CD4]          <- "CD4_T"
+plot_df$category[plot_df$is_CTL_Expanded] <- "CD4_CTL_Expanded"
+
+4.5. Plotting
+Custom colors are defined:
+cols <- c(
+  CM_normal        = "#ffb6c1",
+  CM_stressed      = "#ff1493",
+  CD4_T            = "green",
+  CD4_CTL_Expanded = "blue",
+  Other            = "grey70"
+)
+
+The overlay map:
+Draws all categories as small points (size = 1.8, alpha 0.7).
+Overplots CD4_CTL_Expanded as larger, more opaque points.
+
+p <- ggplot() +
+  geom_point(
+    data = subset(plot_df, category %in% c("CM_normal","CM_stressed","CD4_T","CD4_CTL","Other")),
+    aes(x = x, y = y, color = category),
+    size = 1.8, alpha = 0.7
+  ) +
+  geom_point(
+    data = subset(plot_df, category == "CD4_CTL_Expanded"),
+    aes(x = x, y = y),
+    color = cols["CD4_CTL_Expanded"], size = 2.8, alpha = 0.95
+  ) +
+  scale_color_manual(values = cols, drop = FALSE) +
+  coord_equal() + theme_void() +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+  labs(title = "Spatial map")
+
+ggsave(file.path(base_dir, "overlay_map_expanded.png"), p,
+       width = 8, height = 7, dpi = 300)
+
+Output:
+overlay_map_expanded.png saved in base_dir, showing:
+Normal cardiomyocytes (soft pink)
+Stressed cardiomyocytes (bright pink)
+CD4 T cells (green)
+CD4 CTLs with expanded CDR3 probes (blue, large dots)
+Other cells (grey)
+
+5. How to Run
+Edit base_dir at the top of both blocks to point to the directory of a single patient/ROI.
+In R/RStudio:
+Source the file or run the first block to obtain density_report.
+Run the second block to produce the overlay_map_expanded.png.
+Repeat for each patient/section by changing base_dir.
+-------------------------------------------------------------------------------------------------
