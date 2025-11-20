@@ -504,3 +504,228 @@ Combines heatmaps + 4-layer bar panels using patchwork and saves:
 GLIPH2_heatmaps.png in fig_dir.
 
 -------------------------------------------------------------------------------------
+MYH6 / DUF1002 Stimulation – scRNA-seq + scTCR Analysis
+
+This repository contains an end-to-end R pipeline to analyze 10x Genomics 5′ scRNA-seq and scTCR-seq data from CD4⁺ T cells stimulated with the cardiac peptide MYH6, the oral mimic DUF1002, or left unstimulated. The workflow integrates RNA and TCR data across multiple patients, identifies clonotypes expanded upon stimulation, maps them on UMAPs, performs differential expression within expanded clones, and generates publication-grade figures and statistics. 
+
+1. Pipeline Overview
+The main script performs the following steps:
+
+Load libraries
+Uses Seurat, scRepertoire, data.table, ggplot2, patchwork, and helper utilities for plotting and statistics.
+
+Load and preprocess RNA data
+Expects 10x filtered_feature_bc_matrix directories for four patients (CV5, CV12, CV109, CV110), each with three conditions: Unstim, MYH6, and DUF1002.
+Paths are specified in the rna_paths list.
+
+For each entry, make_seu():
+Reads the 10x matrix with Read10X.
+Creates a Seurat object with CreateSeuratObject.
+Annotates sample_id, patient ID (e.g., CV5), and Condition (Unstim / MYH6 / DUF1002) from the sample name.
+
+Prefixes cell barcodes with sample_id so they remain unique across samples. 
+Per-sample normalization and integration (SCT)
+Performs SCTransform on each sample (v2 flavor, 3000 variable features). 
+
+Selects integration features and prepares objects for SCT-based integration.
+Uses unstimulated samples (CV5_Unstim, CV12_Unstim, CV109_Unstim, CV110_Unstim) as integration references.
+Runs FindIntegrationAnchors and IntegrateData with SCT normalization. 
+
+Dimensional reduction and clustering
+Sets the default assay to "integrated".
+Runs PCA (40 PCs), UMAP (dims 1–30), neighbor graph construction, and Louvain clustering (resolution 0.6). 
+
+Load and harmonize TCR data
+Expects 10x filtered_contig_annotations.csv-style files for each sample, paths defined in contig_paths. 
+
+Reads each CSV (barcode, TCR chains, CDR3s, etc.), adds sample_id, and prefixes barcodes to match Seurat cell names.
+Uses scRepertoire combineTCR() to build a combined.TCR object with clonotype information across all samples/conditions. 
+
+Barcode matching and QC
+Rebuilds TCR barcodes to exactly match Seurat cell names (sample prefix + core barcode).
+Checks which sample_ids overlap between Seurat and combined.TCR.
+Summarizes per-sample: number of TCR rows, unique barcodes, CDR3s with non-NA CTaa, number of mapped cells, and % cells with TCRs. 
+
+Clone definition and expansion across conditions
+Extracts TRA/TRB amino-acid sequences per row, infers missing chains, and assembles a normalized clone label (Clone). 
+
+Counts clone occurrences per sample and aggregates them per Condition (Unstim, MYH6, DUF1002).
+Builds a wide table (per_cond_wide) with counts per clone per condition. 
+
+Identifies expanded clones present in all three conditions but increased in both MYH6 and DUF1002 vs Unstim (shared antigen-responsive clones). 
+
+Alluvial plots of clonal expansion
+For the set of expanded clones, builds a long table and orders clones by DUF1002 + MYH6 counts.
+Uses ggplot2 (with alluvial geometry) to visualize how clone size changes across Unstim → MYH6 → DUF1002 for each clone, saving high-resolution PNG and PDF outputs. 
+
+UMAP projection of expanded clones (CD4⁺ background)
+Infers CD4⁺ T cells either from existing annotations or via CD3D/CD4/CD8A expression. 
+
+Overlays the 27 (or top N) expanded clones on the CD4 UMAP separately for Unstim, MYH6, and DUF1002.
+Colors points by expansion bin (singleton / small / medium / large) and saves condition-specific UMAPs as PNG and PDF. 
+
+Cluster-level mapping of expanded-clone cells
+Determines which Seurat clusters contain at least one of the expanded-clone cells.
+Replots the integrated UMAP, highlighting only those clusters and optionally focusing on a subset of “target” clusters enriched for expanded clones. 
+
+Definition of CD4⁺ cytotoxic clusters
+Restricts analysis to CD4⁺ cells.
+Computes detection frequency and mean expression for cytotoxic markers GZMB, PRF1, NKG7 by cluster.
+Calculates a cytotoxicity score per cluster (Z-score-averaged markers) and flags clusters with high score and high marker detection as CD4 CTL clusters. 
+
+Plots a UMAP of CD4 cells, highlighting CTL-enriched clusters in navy. 
+
+Differential expression in expanded-clone cells
+Subsets the Seurat object to cells belonging to expanded clones (e.g., the “27 clones”), creates seu_27.
+Ensures RNA assay has a "data" layer (joins layers or runs log-normalization as needed).
+Runs FindMarkers (Wilcoxon test) for MYH6 vs Unstim and DUF1002 vs Unstim, focusing on genes expressed in ≥5% of cells with log2FC ≥ 0.1. 
+
+Extracts shared upregulated genes (FDR < 0.05, log2FC > 0 in both comparisons) and previews them in a bar plot ordered by mean log2FC. 
+
+Per-gene summary plots with statistics
+For a curated panel of TCR-proximal / activation genes (e.g., JUN, DUSP4, DUSP16, TNFAIP3, BTG1, PDCD4, LDHA, HIF1A, STK17A, IL7R, NFKBIA), the pipeline: 
+
+Aggregates expression per clone and condition (mean log1p(count) per clone).
+Computes per-gene paired Wilcoxon tests (MYH6 vs Unstim, DUF1002 vs Unstim) plus rank-biserial effect sizes. 
+
+Generates compact bar + dot plots with overlaid p-values, saving PNG/PDF for each gene. 
+
+Optionally exports a CSV with per-gene statistics (p-values, effect sizes, number of pairs). 
+
+2. Input Data and Directory Structure
+Before running the script, you must edit the paths for your data.
+2.1 RNA (gene expression) input
+The script expects 10x Genomics 5′ filtered_feature_bc_matrix outputs organized as: 
+
+rna_paths <- list(
+  CV5_Unstim   = "/path/to/CV5_Unstim/filtered_feature_bc_matrix",
+  CV5_MYH6     = "/path/to/CV5_MYH6/filtered_feature_bc_matrix",
+  CV5_DUF1002  = "/path/to/CV5_DUF1002/filtered_feature_bc_matrix",
+  CV12_Unstim  = "/path/to/CV12_Unstim/filtered_feature_bc_matrix",
+  CV12_MYH6    = "/path/to/CV12_MYH6/filtered_feature_bc_matrix",
+  CV12_DUF1002 = "/path/to/CV12_DUF1002/filtered_feature_bc_matrix",
+  CV109_Unstim = "/path/to/CV109_Unstim/filtered_feature_bc_matrix",
+  CV109_MYH6   = "/path/to/CV109_MYH6/filtered_feature_bc_matrix",
+  CV109_DUF1002= "/path/to/CV109_DUF1002/filtered_feature_bc_matrix",
+  CV110_Unstim = "/path/to/CV110_Unstim/filtered_feature_bc_matrix",
+  CV110_MYH6   = "/path/to/CV110_MYH6/filtered_feature_bc_matrix",
+  CV110_DUF1002= "/path/to/CV110_DUF1002/filtered_feature_bc_matrix"
+)
+
+Each directory should contain the standard 10x files:
+barcodes.tsv.gz
+features.tsv.gz (or genes.tsv.gz)
+matrix.mtx.gz
+
+2.2 TCR (contig) input
+The script expects one TCR contig CSV per sample, preferably the 10x filtered_contig_annotations.csv or an equivalent file. Paths are specified in contig_paths: 
+
+contig_paths <- list(
+  CV5_Unstim   = "/path/to/CV5_Unstim/filtered_contig_annotations.csv",
+  CV5_MYH6     = "/path/to/CV5_MYH6/filtered_contig_annotations.csv",
+  CV5_DUF1002  = "/path/to/CV5_DUF1002/filtered_contig_annotations.csv",
+  CV12_Unstim  = "/path/to/CV12_Unstim/filtered_contig_annotations.csv",
+  CV12_MYH6    = "/path/to/CV12_MYH6/filtered_contig_annotations.csv",
+  CV12_DUF1002 = "/path/to/CV12_DUF1002/filtered_contig_annotations.csv",
+  CV109_Unstim = "/path/to/CV109_Unstim/filtered_contig_annotations.csv",
+  CV109_MYH6   = "/path/to/CV109_MYH6/filtered_contig_annotations.csv",
+  CV109_DUF1002= "/path/to/CV109_DUF1002/filtered_contig_annotations.csv",
+  CV110_Unstim = "/path/to/CV110_Unstim/filtered_contig_annotations.csv",
+  CV110_MYH6   = "/path/to/CV110_MYH6/filtered_contig_annotations.csv",
+  CV110_DUF1002= "/path/to/CV110_DUF1002/filtered_contig_annotations.csv"
+)
+
+Important: Barcodes in these CSVs must match the 10x RNA barcodes for each sample (the script then adds sample-specific prefixes to match Seurat cells).
+
+3. Software Requirements
+R ≥ 4.1 (recommended)
+Core packages:
+Seurat, SeuratObject
+scRepertoire
+dplyr, tidyr, data.table
+ggplot2, patchwork, scales
+ggalluvial, ggnewscale (for some plots; check missing-package errors)
+The script begins with:
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(SeuratObject)
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(patchwork)
+  library(scRepertoire)
+  library(data.table)
+  library(scales)
+})
+
+You may need to install any missing packages with install.packages() or BiocManager::install() where appropriate. 
+
+4. How to Run
+Clone or copy this repository
+git clone <your_repo_url>
+cd <your_repo>
+Edit paths at the top of the script
+Set rna_paths to the actual locations of your 10x RNA matrices.
+Set contig_paths to the actual locations of your TCR contig CSVs.
+Update any "Path to Save/...png" or "...pdf" paths to desired output directories.
+Start R / RStudio and source the script
+From an R session:
+source("GitHub MYH6:DUF1002 Stim.R")
+
+The script runs sequentially through data loading, integration, TCR mapping, clone expansion analysis, DE tests, and figure generation.
+
+Inspect outputs
+Check the console summary tables for:
+Per-sample mapping of TCRs to Seurat cells.
+Number of expanded clones.
+Top shared upregulated genes in MYH6/DUF1002 vs Unstim.
+
+Review PNG/PDF files generated for:
+Alluvial plots of clone counts across conditions.
+UMAPs showing expanded clones and CTL clusters.
+Per-gene bar + dot plots with p-values.
+
+5. Key Outputs
+Depending on which sections you run and your chosen output paths, the script will generate:
+TCR_alluvial_plot.png / .pdf
+– Alluvial plot of clone sizes across Unstim / MYH6 / DUF1002. 
+
+UMAP_CD4_27clones_<Condition>.png / .pdf
+– UMAPs of CD4⁺ cells with expanded clones colored by expansion category (singleton / small / medium / large). 
+
+UMAP_selected_clusters_no_annotations.png / .pdf
+– Integrated UMAP with clusters harboring expanded clones highlighted. 
+
+UMAP_CD4_cytotoxic_clusters_navy.png / .pdf
+– CD4⁺ UMAP highlighting cytotoxic clusters enriched for GZMB/PRF1/NKG7. 
+
+BAR_<GENE>.png / .pdf
+– Per-gene bar + dot plots (e.g., BAR_JUN.png, BAR_NFKBIA.png) with p-values for MYH6 vs Unstim and DUF1002 vs Unstim. 
+
+Optional CSV:
+A statistics table summarizing p-values and rank-biserial effect sizes for each gene in the panel. 
+
+6. Customization
+You can adjust several aspects of the analysis:
+Conditions and sample naming
+The script infers Condition from the suffix in sample_id (e.g., _Unstim, _MYH6, _DUF1002). If you add new conditions, extend the regex and factor levels accordingly. 
+
+Clonal expansion criteria
+By default, “expanded” clones are present in all three conditions and have higher counts in both MYH6 and DUF1002 vs Unstim. Modify the filtering on per_cond_wide to use different thresholds or criteria. 
+
+Number of clones visualized
+The script often uses TOP_N or the “top 27” clones for visualization. This can be changed to include more or fewer clones. 
+
+Gene panels
+The tcr_direct_genes vector defines the genes for the bar + dot plots; you can add or remove genes as needed. 
+
+Cytotoxic cluster thresholding
+You can modify the cytotoxicity score quantile (e.g., 75th percentile) and the minimum detection percentage for GZMB/PRF1/NKG7 used to define enriched CD4 CTL clusters. 
+
+7. Notes and Limitations
+The script assumes standard 10x barcoding conventions and that each sample_id in rna_paths has a corresponding TCR file in contig_paths.
+Helper objects such as cell_map and helper functions like fix_contig_cols() must be present in the environment if defined elsewhere in your analysis pipeline (e.g., another source file); ensure they are sourced before running sections that depend on them. 
+
+The workflow is tuned for CD4⁺ T-cell biology under MYH6 and DUF1002 peptide stimulation; adapting it to other systems may require updating marker genes, conditions, and QC criteria.
+
+-------------------------------------------------------------------------------------------------------------------
