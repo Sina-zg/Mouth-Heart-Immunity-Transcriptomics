@@ -198,6 +198,7 @@ Complex Heatmap – CD4⁺ T-cell Gene × Clonotype Landscape
 This script builds a publication-grade ComplexHeatmap of CD4⁺ T cells from NICM patients, integrating gene expression and TCR clonality to contrast Progressor vs Survivor groups. It loads per-patient 10x RNA (filtered_feature_bc_matrix) and TCR (filtered_contig_annotations_*.csv) data, performs basic QC (nFeature/nCount/percent.mt) and normalization, merges samples into a single Seurat object, and restricts the analysis to CD3D⁺CD4⁺ cells. TCR contigs are processed to define CDR3-based clonotypes (CTaa), compute clone size per clonotype, and assign each cell a clone-size category (Singleton, Small, Medium, Large), which is added to the Seurat metadata along with standard QC metrics.
 
 A curated gene panel (naïve, activation, cytotoxic, exhaustion, etc.) is then selected, scaled (Z-scores) and extracted as a cell × gene matrix. Columns (cells) are ordered by group (Progressor vs Survivor), clone-size category, TCR frequency, and patient ID, while rows (genes) retain a fixed biological order. The script assembles a ComplexHeatmap with genes as rows and single cells as columns, split by clinical group and decorated with rich top annotations (group, patient, clone size, mitochondrial %, read depth, feature counts, TCR frequency). The result is exported as both high-resolution PNG and vector PDF, providing a compact, interpretable view of how CD4⁺ T-cell phenotypes and clonal expansion differ between Progressors and Survivors.
+
 ---------------------------------------------------------------------
 
 Pathway Analysis – Pseudobulk DESeq2 + GSEA
@@ -205,6 +206,7 @@ Pathway Analysis – Pseudobulk DESeq2 + GSEA
 This script performs pathway-level analysis of CD4⁺ T-cell transcriptional programs in NICM and periodontitis cohorts using a pseudobulk DESeq2 + GSEA framework. Starting from single-cell RNA-seq (10x) for NICM Progressor/Survivor and PD HighCTL/LowCTL patients, it applies QC and CD4⁺ T-cell gating, collapses raw counts to pseudobulk profiles per sample, and fits DESeq2 models to compare PD_HighCTL vs PD_LowCTL and NICM_Progressor vs NICM_Survivor. Wald statistics from these contrasts are then used as ranking metrics for GSEA against Hallmark and GO Biological Process gene sets, generating full enrichment tables, summary plots, and cross-cohort NES concordance.
 
 Downstream, the script focuses on T cell– and cytotoxicity-related pathways, extracting a core panel of immune signatures enriched in PD HighCTL and re-evaluating the same pathways in NICM Progressors to visualize shared and distinct programs (e.g., via two-condition bar/scatter panels). It also produces supplementary enrichment curves for key GO BP terms (T-cell activation, cell killing, leukocyte-mediated cytotoxicity, NK cell immunity) for inclusion in main and supplementary figures. To use it, set the project and RNA base directories, ensure the required R packages (Seurat, scDblFinder, DESeq2, fgsea, msigdbr, etc.) are installed, and run the script end-to-end in R/RStudio; all QC metrics, DE tables, and GSEA results are written to organized results/ subdirectories.
+
 ------------------------------------------------------------------------------------------
 
 GLIPH2 Analysis – Motif Filtering and Cross-Cohort Visualization
@@ -223,6 +225,7 @@ This script analyzes 10x scRNA-seq and scTCR-seq data from CD4⁺ T cells stimul
 Using these integrated RNA–TCR profiles, the pipeline identifies antigen-responsive clonotypes that are present in all three conditions but show expansion under MYH6 and DUF1002 stimulation. It generates alluvial plots of clonal abundance across conditions, UMAP overlays highlighting expanded clones within CD4 CTL–enriched clusters, and differential expression analyses restricted to cells from expanded clones (MYH6 vs Unstim and DUF1002 vs Unstim). A curated activation/TCR-proximal gene panel is then summarized with compact bar/dot plots and paired statistics, providing a focused transcriptional signature of peptide-responsive CD4 CTLs.
 
 To run the script, set the RNA and TCR path lists to your 10x outputs, choose an output directory, and execute the file in R/RStudio from top to bottom. Sample names, condition labels (Unstim/MYH6/DUF1002), marker panels, DE thresholds, and clone-selection criteria are all defined in a small number of vectors/filters and can be easily adapted to different donors, peptides, or stimulation designs.
+
 -------------------------------------------------------------------------------------------------------------------
 scRNA-seq + scTCR-seq CD4 T-cell Pipeline
 
@@ -231,6 +234,7 @@ This script performs an integrated analysis of 10x scRNA-seq and scTCR-seq data 
 After integration, the pipeline clusters and annotates major CD4 subsets (naive/CM, memory, Th1-like, Treg, CD4 CTL, activated memory), generates UMAPs, and quantifies population composition across clinical groups. It then processes TCR contigs to assign one TRA and one TRB chain per cell, constructs combined clonotypes (CTaa), computes clone sizes and expansion categories, and overlays this information onto the integrated object. Downstream outputs include stacked barplots of clonal expansion by group and cluster, UMAPs colored by expansion category, and a focused CD4 CTL “signature” comparison (e.g., Progressor vs PD HighCTL) using a curated gene panel.
 
 To use the script, point the RNA and TCR paths to your per-sample 10x outputs, set the output directory, and run the file in R/RStudio from top to bottom. Sample and group labels, marker panels, QC thresholds, and clonal expansion bins are defined in a few central vectors and can be easily adapted to other cohorts or disease comparisons.
+
 -----------------------------------------------------------------------------------------------------------
 
 Spatial Transcriptomics – Densities and CD4 CTL Overlay
@@ -241,6 +245,7 @@ It reads the standard matrix.mtx.gz, barcodes.tsv.gz, features.tsv.gz, and cell_
 For each ROI, the script reports a compact density table (cells per mm²) for normal and stressed cardiomyocytes, T-cell subsets (including CD4 CTL and CD4 CTL with expanded CDR3/TCR genes), B cells, myeloid cells, HLA⁺ cells, apoptosis-signature cells, and fibrosis-like cells. In parallel, it computes cell centroids from the polygon boundaries and produces a spatial overlay plot in which normal and stressed cardiomyocytes, CD4 T cells, and expanded CD4 CTLs are overlaid on the tissue with distinct colors, exporting a high-resolution PNG.
 
 To use the script, set base_dir to the per-patient spatial output directory and run both blocks in R. The gene panels, positivity definition (currently ≥1 molecule), and color scheme can be easily adjusted to match specific biology or figure style requirements.
+
 ----------------------------------------------------------------------------------------------------
 Xenium Spatial – Progressor vs Survivor Tissue Programs
 
