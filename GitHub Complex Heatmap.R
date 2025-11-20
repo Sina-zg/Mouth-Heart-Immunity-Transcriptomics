@@ -8,7 +8,7 @@ library(grid)
 
 #----Sample Direction----
 sample_info <- data.frame(
-  sample_id = c("CV5","CV109","CV12","CV110","CV39","CV87","CV103","CV106"),
+  sample_id = c("NICM1","NICM2","NICM3","NICM4","NICM5","NICM6","NICM7","NICM8"),
   group     = c("Progressor","Progressor","Progressor","Progressor",
                 "Survivor","Survivor","Survivor","Survivor"),
   stringsAsFactors = FALSE
@@ -16,7 +16,7 @@ sample_info <- data.frame(
 
 #----Load & QC of Samples----
 seurat_list <- lapply(sample_info$sample_id, function(id) {
-  mtx <- Read10X(paste0("/Users/sina_zg/Desktop/Sina_Air/Matrix/sample_filtered_feature_bc_matrix_", id))
+  mtx <- Read10X(paste0("Path to sample_filtered_feature_bc_matrix_", id))
   obj <- CreateSeuratObject(counts = mtx, project = id)
   obj$sample_id <- id
   obj$group <- sample_info$group[sample_info$sample_id == id]
@@ -49,7 +49,7 @@ seurat_combined_clean <- NormalizeData(seurat_combined_clean, verbose = FALSE)
 
 #----Load TCR Samples----
 tcr_list <- lapply(sample_info$sample_id, function(id) {
-  tcr <- read.csv(paste0("/Users/sina_zg/Desktop/Sina_Air/Sequencing Analysis/filtered_contig_annotations_", id, ".csv"))
+  tcr <- read.csv(paste0("Path to filtered_contig_annotations_", id, ".csv"))
   tcr <- tcr[tcr$productive == "true", ]
   tcr$barcode <- paste0(id, "_", tcr$barcode)
   tcr$CTaa <- tcr$cdr3
@@ -140,7 +140,7 @@ stopifnot(identical(colnames(expr_matrix_sorted), rownames(meta_sorted)))
 
 #----Plot Color Drafting----
 
-patient_levels <- c("CV5","CV12","CV109","CV110","CV39","CV87","CV103","CV106")
+patient_levels <- c("Progressor1","Progressor2","Progressor3","Progressor4","Survivor1","Survivor2","Survivor3","Survivor4")
 meta_sorted$Patient <- factor(meta_sorted$Patient, levels = patient_levels)
 patient_cols <- setNames(
   c("#E69F00","#56B4E9","#009E73","#F0E442","#0072B2","#D55E00","#CC79A7","#999999"),
@@ -190,14 +190,12 @@ ht_full <- Heatmap(
 )
 
 #----Export PNG/PDF----
-png("/Users/sina_zg/Desktop/CD4_CTL_Heatmap_CellStyle_FULL_CloneBlocks_NoSubpanels.png",
+png("Path to results directory.png",
     width = 4800, height = 2600, res = 300)
 draw(ht_full, heatmap_legend_side = "right", annotation_legend_side = "right")
 dev.off()
 
-pdf("/Users/sina_zg/Desktop/CD4_CTL_Heatmap_CellStyle_FULL_CloneBlocks_NoSubpanels.pdf",
+pdf("Path to results directory.pdf",
     width = 16, height = 9)
 draw(ht_full, heatmap_legend_side = "right", annotation_legend_side = "right")
 dev.off()
-
-
