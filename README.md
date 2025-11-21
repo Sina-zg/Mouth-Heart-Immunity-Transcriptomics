@@ -2,13 +2,13 @@
 Reproducible code for the Periodontal Disease → cardiovascular study: scRNA-seq + scTCR-seq (Seurat, scRepertoire, GLIPH2), spatial transcriptomics (10x), and microbiome profiling (HUMAnN3, phyloseq, MaAsLin2). Includes QC, integration, clonotypes, pseudobulk DE, GSEA, alpha/beta diversity, differential abundance, and figure scripts.
 
 ------------------------------------------------------------------------------------------------------------------
-##Volcano Plot – Differential Microbial Abundance
+# Volcano Plot – Differential Microbial Abundance
 
 This script builds publication-ready volcano plots for differential microbial abundance between two groups (e.g., high vs low CD4). It reads a taxa code–to–taxonomy mapping (taxa_codes.csv) and differential abundance results from the RNA-seq pipeline (rnaseq_de.csv), merges them, cleans the taxonomy strings to extract Genus/Species labels, and computes log₂ fold change and –log₁₀(p-value) with a simple significance classification. From these results, it selects the top 5 upregulated and top 5 downregulated taxa and generates two matched volcano plots: one version with labels on the top 10 significant taxa and a clean version without labels, suitable for flexible placement in main or supplementary figures.
 The script requires only tidyverse and ggrepel, and assumes standard input formats (taxa codes and taxonomy in taxa_codes.csv, and Code, log2FC, Pvalues in rnaseq_de.csv). Output is written as high-resolution SVG files (volcano_top10.svg and volcano_top10_unlab.svg) to the directory specified in the script, providing a compact visualization of microbial shifts associated with CD4 T-cell status.
 
 ------------------------------------------------------------------------------------------------------------------
-##Microbiome Community Structure & Differential Abundance - Shotgun Metagenomics
+## Microbiome Community Structure & Differential Abundance - Shotgun Metagenomics
 
 This script analyzes microbiome community structure and diversity from HUMAnN3-derived taxonomic tables, using species- and genus-level relative abundances (buglist.tsv) together with sample metadata (metadata.xlsx). After cleaning and harmonizing sample IDs and sample types (e.g., Survivors vs Progressors), it builds a phyloseq object, computes alpha diversity (Observed, Shannon, Simpson) and beta diversity (Bray–Curtis), and runs PCoA with PERMANOVA to test group differences, exporting species-level PCoA plots and alpha-diversity summaries. It also uses ComplexHeatmap to visualize the top 30 most abundant species across groups and generates annotated heatmaps for main or supplementary figures.
 
