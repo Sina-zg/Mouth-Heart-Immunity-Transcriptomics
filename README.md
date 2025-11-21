@@ -2,7 +2,7 @@
 Reproducible code for the Periodontal Disease → cardiovascular study: scRNA-seq + scTCR-seq (Seurat, scRepertoire, GLIPH2), spatial transcriptomics (10x), and microbiome profiling (HUMAnN3, phyloseq, MaAsLin2). Includes QC, integration, clonotypes, pseudobulk DE, GSEA, alpha/beta diversity, differential abundance, and figure scripts.
 
 ------------------------------------------------------------------------------------------------------------------
-# Volcano Plot – Differential Microbial Abundance
+## Volcano Plot – Differential Microbial Abundance
 
 This script builds publication-ready volcano plots for differential microbial abundance between two groups (e.g., high vs low CD4). It reads a taxa code–to–taxonomy mapping (taxa_codes.csv) and differential abundance results from the RNA-seq pipeline (rnaseq_de.csv), merges them, cleans the taxonomy strings to extract Genus/Species labels, and computes log₂ fold change and –log₁₀(p-value) with a simple significance classification. From these results, it selects the top 5 upregulated and top 5 downregulated taxa and generates two matched volcano plots: one version with labels on the top 10 significant taxa and a clean version without labels, suitable for flexible placement in main or supplementary figures.
 The script requires only tidyverse and ggrepel, and assumes standard input formats (taxa codes and taxonomy in taxa_codes.csv, and Code, log2FC, Pvalues in rnaseq_de.csv). Output is written as high-resolution SVG files (volcano_top10.svg and volcano_top10_unlab.svg) to the directory specified in the script, providing a compact visualization of microbial shifts associated with CD4 T-cell status.
@@ -15,21 +15,21 @@ This script analyzes microbiome community structure and diversity from HUMAnN3-d
 Downstream, the script performs differential abundance testing with MaAsLin2 at both species and genus levels, saving all model outputs and creating publication-ready visualizations: volcano-style summaries, group-wise boxplots for selected taxa (e.g., Streptococcus sanguinis with jittered points, mean ± SE, and MaAsLin2-derived p/q-values), and facet boxplots for key genera. All major outputs (PCoA_S.svg, AD_S_SHAN_SIMP.svg, Heatmap_Top30_Taxa.svg, maaslin2_output/, Boxplot_Ss_custom.svg, Boxplots_G.svg, maaslin2_g_output/) are written to user-defined output directories; to run the workflow, simply update the input paths near the top of the script, ensure the required R packages (tidyverse, vegan, phyloseq, ComplexHeatmap, MaAsLin2, ggplot2, patchwork) are installed, and execute the script top-to-bottom in R/RStudio.
    
 ----------------------------------------------------------------------
-##Complex Heatmap – CD4⁺ T-cell Gene × Clonotype Landscape
+## Complex Heatmap – CD4⁺ T-cell Gene × Clonotype Landscape
 
 This script builds a publication-grade ComplexHeatmap of CD4⁺ T cells from NICM patients, integrating gene expression and TCR clonality to contrast Progressor vs Survivor groups. It loads per-patient 10x RNA (filtered_feature_bc_matrix) and TCR (filtered_contig_annotations_*.csv) data, performs basic QC (nFeature/nCount/percent.mt) and normalization, merges samples into a single Seurat object, and restricts the analysis to CD3D⁺CD4⁺ cells. TCR contigs are processed to define CDR3-based clonotypes (CTaa), compute clone size per clonotype, and assign each cell a clone-size category (Singleton, Small, Medium, Large), which is added to the Seurat metadata along with standard QC metrics.
 
 A curated gene panel (naïve, activation, cytotoxic, exhaustion, etc.) is then selected, scaled (Z-scores) and extracted as a cell × gene matrix. Columns (cells) are ordered by group (Progressor vs Survivor), clone-size category, TCR frequency, and patient ID, while rows (genes) retain a fixed biological order. The script assembles a ComplexHeatmap with genes as rows and single cells as columns, split by clinical group and decorated with rich top annotations (group, patient, clone size, mitochondrial %, read depth, feature counts, TCR frequency). The result is exported as both high-resolution PNG and vector PDF, providing a compact, interpretable view of how CD4⁺ T-cell phenotypes and clonal expansion differ between Progressors and Survivors.
 
 ---------------------------------------------------------------------
-##Pathway Analysis – Pseudobulk DESeq2 + GSEA
+## Pathway Analysis – Pseudobulk DESeq2 + GSEA
 
 This script performs pathway-level analysis of CD4⁺ T-cell transcriptional programs in NICM and periodontitis cohorts using a pseudobulk DESeq2 + GSEA framework. Starting from single-cell RNA-seq (10x) for NICM Progressor/Survivor and PD HighCTL/LowCTL patients, it applies QC and CD4⁺ T-cell gating, collapses raw counts to pseudobulk profiles per sample, and fits DESeq2 models to compare PD_HighCTL vs PD_LowCTL and NICM_Progressor vs NICM_Survivor. Wald statistics from these contrasts are then used as ranking metrics for GSEA against Hallmark and GO Biological Process gene sets, generating full enrichment tables, summary plots, and cross-cohort NES concordance.
 
 Downstream, the script focuses on T cell– and cytotoxicity-related pathways, extracting a core panel of immune signatures enriched in PD HighCTL and re-evaluating the same pathways in NICM Progressors to visualize shared and distinct programs (e.g., via two-condition bar/scatter panels). It also produces supplementary enrichment curves for key GO BP terms (T-cell activation, cell killing, leukocyte-mediated cytotoxicity, NK cell immunity) for inclusion in main and supplementary figures. To use it, set the project and RNA base directories, ensure the required R packages (Seurat, scDblFinder, DESeq2, fgsea, msigdbr, etc.) are installed, and run the script end-to-end in R/RStudio; all QC metrics, DE tables, and GSEA results are written to organized results/ subdirectories.
 
 ------------------------------------------------------------------------------------------
-##GLIPH2 Analysis – Motif Filtering and Cross-Cohort Visualization
+## GLIPH2 Analysis – Motif Filtering and Cross-Cohort Visualization
 
 This script prepares 10x scTCR-seq data for GLIPH2, filters GLIPH2 motif outputs with stringent donor- and score-based criteria, and visualizes convergent TCR motifs across NICM and periodontitis cohorts. It reads filtered_contig_annotations files for PD HighCTL / PD LowCTL and NICM Progressor / Survivor samples, standardizes the TCR tables, and resolves one high-confidence TRA and TRB chain per cell. From these, it builds GLIPH2-ready clonotype inputs (CDR3β with V/J gene calls) and, after GLIPH2 is run externally, re-imports the GLIPH2 CSV outputs for downstream analysis.
 
@@ -38,7 +38,7 @@ GLIPH2 motif tables (e.g., Prog+PD High, Surv+PD Low, and an all-samples run) ar
 To use the script, point the input paths to your filtered_contig_annotations files and GLIPH2 result CSVs, set output directories for results and figures, and run the file in R/RStudio from top to bottom. Sample grouping, score cutoffs, and plotting aesthetics are defined in a few central variables and can be easily tuned for alternative cohorts, GLIPH2 runs, or motif-selection criteria.
 
 -------------------------------------------------------------------------------------
-##MYH6 / DUF1002 Stimulation – scRNA-seq + scTCR-seq Pipeline
+## MYH6 / DUF1002 Stimulation – scRNA-seq + scTCR-seq Pipeline
 
 This script analyzes 10x scRNA-seq and scTCR-seq data from CD4⁺ T cells stimulated with the cardiac peptide MYH6, the oral mimic DUF1002, or left unstimulated across multiple donors. It reads per-sample 10x filtered_feature_bc_matrix and filtered_contig_annotations files, performs QC and SCT-based integration of all conditions, and builds a unified CD4⁺ T-cell atlas with UMAP and clustering. TCR contigs are processed to assign one TRA and one TRB chain per cell, define amino acid clonotypes (CTaa), and quantify clone sizes across Unstim, MYH6, and DUF1002.
 
@@ -47,7 +47,7 @@ Using these integrated RNA–TCR profiles, the pipeline identifies antigen-respo
 To run the script, set the RNA and TCR path lists to your 10x outputs, choose an output directory, and execute the file in R/RStudio from top to bottom. Sample names, condition labels (Unstim/MYH6/DUF1002), marker panels, DE thresholds, and clone-selection criteria are all defined in a small number of vectors/filters and can be easily adapted to different donors, peptides, or stimulation designs.
 
 -------------------------------------------------------------------------------------------------------------------
-##scRNA-seq + scTCR-seq CD4 T-cell Pipeline
+## scRNA-seq + scTCR-seq CD4 T-cell Pipeline
 
 This script performs an integrated analysis of 10x scRNA-seq and scTCR-seq data from CD4⁺ T cells across NICM Progressor vs Survivor patients and periodontitis HighCTL vs LowCTL groups. It takes 10x filtered_feature_bc_matrix and filtered_contig_annotations files per sample, applies stringent QC (mitochondria, features, counts, doublets), gates on CD4 T cells at the expression level, and uses SCT-based integration to build a unified CD4⁺ T-cell atlas.
 
@@ -56,7 +56,7 @@ After integration, the pipeline clusters and annotates major CD4 subsets (naive/
 To use the script, point the RNA and TCR paths to your per-sample 10x outputs, set the output directory, and run the file in R/RStudio from top to bottom. Sample and group labels, marker panels, QC thresholds, and clonal expansion bins are defined in a few central vectors and can be easily adapted to other cohorts or disease comparisons.
 
 -----------------------------------------------------------------------------------------------------------
-##Spatial Transcriptomics – Densities and CD4 CTL Overlay
+## Spatial Transcriptomics – Densities and CD4 CTL Overlay
 
 This script analyzes Xenium (or similar) spatial transcriptomics data to (i) quantify cell-type densities per mm² and (ii) generate a spatial map highlighting cardiomyocytes and CD4⁺ cytotoxic T cells with expanded TCRs.
 
@@ -66,7 +66,7 @@ For each ROI, the script reports a compact density table (cells per mm²) for no
 To use the script, set base_dir to the per-patient spatial output directory and run both blocks in R. The gene panels, positivity definition (currently ≥1 molecule), and color scheme can be easily adjusted to match specific biology or figure style requirements.
 
 ----------------------------------------------------------------------------------------------------
-##Xenium Spatial – Progressor vs Survivor Tissue Programs
+## Xenium Spatial – Progressor vs Survivor Tissue Programs
 
 This script analyzes Xenium In Situ spatial transcriptomics from NICM Progressor and Survivor hearts to map major tissue compartments and compare their abundance and transcriptional states between groups. It loads per-patient Xenium outs directories, applies QC using control probes and gene-count thresholds, normalizes with SCTransform, and builds Harmony-corrected UMAP embeddings. Using curated gene panels (cardiomyocyte, endothelial, immune, fibroblast/myofibroblast, stress, fibrosis), it computes signature scores per cell, assigns each cell to a coarse focus_category (Cardiomyocyte, Stressed CM, Endothelium, Immune, Fibroblast/Myofibroblast), and removes low-confidence “islands” via DBSCAN on the UMAP to retain only well-supported tissue programs.
 
