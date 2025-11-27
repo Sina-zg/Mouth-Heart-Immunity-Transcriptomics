@@ -298,10 +298,189 @@ theme_umap <- theme_minimal(base_size=16) +
 print(
   DimPlot(integrated, reduction="umap", label=TRUE, repel=TRUE, pt.size=3,
           cols = pal, raster=TRUE) +
-    ggtitle("Annotated UMAP — res 0.25") + theme_umap
+    ggtitle("Annotated UMAP") + theme_umap
+)
+                     
+#--------Volcano Plot--------
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(dplyr)
+})
+
+#----cluster annotations as identities----
+Idents(integrated) <- "annotation"
+table(Idents(integrated))
+
+#----Table----
+table(integrated$group)
+
+integrated$PD_CTL_status <- NA_character_
+integrated$PD_CTL_status[integrated$group == "PD_HighCTL"] <- "PD_High"
+integrated$PD_CTL_status[integrated$group == "PD_LowCTL"]  <- "PD_Low"
+
+table(integrated$PD_CTL_status, useNA = "ifany")
+
+integrated$CTL_PD_contrast <- NA_character_
+
+integrated$CTL_PD_contrast[
+  integrated$annotation == "CD4 CTL" &
+    integrated$PD_CTL_status == "PD_High"
+] <- "HighPD_CD4CTL"
+
+integrated$CTL_PD_contrast[
+  integrated$annotation != "CD4 CTL" &
+    integrated$PD_CTL_status %in% c("PD_High", "PD_Low")
+] <- "PD_Other_CD4"
+
+table(integrated$CTL_PD_contrast, useNA = "ifany")
+
+#----PD----
+sub_PD <- subset(integrated, cells = which(!is.na(integrated$CTL_PD_contrast)))
+Idents(sub_PD) <- "CTL_PD_contrast"
+table(Idents(sub_PD))
+
+DefaultAssay(sub_PD) <- "SCT"
+
+sub_PD <- PrepSCTFindMarkers(sub_PD, verbose = FALSE)
+
+de_PD_CTL <- FindMarkers(
+  sub_PD,
+  ident.1         = "HighPD_CD4CTL",
+  ident.2         = "PD_Other_CD4",
+  assay           = "SCT",
+  test.use        = "wilcox",
+  min.pct         = 0.1,
+  logfc.threshold = 0
 )
 
+de_PD_CTL <- de_PD_CTL |>
+  tibble::rownames_to_column("gene") |>
+  filter(
+    !grepl("^(TR[ABDG]|IG[HKL])", gene),
+    !grepl("^MT-", gene),
+    !grepl("^RP[SL]", gene)
+  )
 
+write.csv(
+  de_PD_CTL,
+  "DE_PDHigh_CD4CTL_vs_PD_OtherCD4_SCT.csv",
+  row.names = FALSE
+)
+
+#----Volcano----
+volcano_df <- de_PD_CTL %>%
+  # remove TCR / Ig / MT / ribosomal for clarity
+  filter(
+    !grepl("^(TR[ABDG]|IG[HKL])", gene),
+    !grepl("^MT-", gene),
+    !grepl("^RP[SL]", gene)
+  ) %>%
+  mutate(
+    neg_log10_p = -log10(p_val_adj + 1e-300),
+    sig = case_when(
+      p_val_adj < 0.05 & avg_log2FC >= 0.5  ~ "Up",
+      p_val_adj < 0.05 & avg_log2FC <= -0.5 ~ "Down",
+      TRUE                                   ~ "NS"
+    )
+  )
+
+#----genes of interest----
+up_genes <- c(
+  "GZMB","GZMH","GNLY","PRF1","NKG7","CCL5","GZMM","GZMA",
+  "ZEB2","PLEK","TBX21","CX3CR1"
+)
+
+#----downregulaed----
+down_genes <- c(
+  "CCR7","CD27","CD28","LEF1","TCF7","DPP4","SELL","PI16",
+  "TIAM1","CCR4","CCR6","LTB"
+)
+
+interest_genes <- c(up_genes, down_genes)
+
+interest_df <- volcano_df %>%
+  filter(gene %in% interest_genes) %>%
+  mutate(
+    class_interest = ifelse(gene %in% up_genes,
+                            "Up_interest", "Down_interest")
+  )
+
+#----Labelling----
+
+label_genes_up <- c("GZMB","GZMH","GNLY","PRF1","NKG7","CCL5","GZMM","GZMA",
+                    "ZEB2","PLEK","TBX21","CX3CR1")  
+
+label_genes_down <- c("CCR7","CD27","CD28","LEF1","TCF7","DPP4","SELL","PI16",
+                      "TIAM1","CCR4","CCR6","LTB")  
+
+label_df <- interest_df %>%
+  filter(gene %in% c(label_genes_up, label_genes_down))
+pal_sig <- c(
+  "Down" = "#4575b4",
+  "NS"   = "grey80",
+  "Up"   = "#d73027"
+)
+
+fill_interest <- c(
+  "Up_interest"   = "#8b0000", 
+  "Down_interest" = "#000080"   
+)
+
+set.seed(1234)
+
+p_volcano <- ggplot(volcano_df,
+                    aes(x = avg_log2FC, y = neg_log10_p)) +
+  
+  geom_point(aes(color = sig), alpha = 0.20, size = 1.6) +
+  scale_color_manual(values = pal_sig) +
+  
+  geom_point(
+    data  = interest_df,
+    aes(fill = class_interest),
+    shape = 21,
+    color = "black",
+    stroke = 0.7,
+    size   = 3.4
+  ) +
+  scale_fill_manual(values = fill_interest, guide = "none") +
+  
+  #----FDR/FC thresholds----
+  geom_vline(xintercept = c(-0.5, 0.5),
+             linetype = "dashed", linewidth = 0.9) +
+  geom_hline(yintercept = -log10(0.05),
+             linetype = "dashed", linewidth = 0.9) +
+  
+  
+  geom_text_repel(
+    data = label_df,
+    aes(label = gene),
+    size = 5,
+    color = "black",
+    max.overlaps = 30,       
+    min.segment.length = 0,
+    box.padding = 0.4,
+    point.padding = 0.35
+  ) +
+  coord_cartesian(xlim = c(-7.5, 7.5), ylim = c(0, 320)) +
+  labs(
+    title = "PD High CD4 CTL vs rest of the CD4",
+    x     = expression(log[2]~fold-change),
+    y     = expression(-log[10]~adjusted~italic(P)),
+    color = NULL
+  ) +
+  theme_classic(base_size = 20) +
+  theme(
+    plot.title      = element_text(face = "bold", hjust = 0.5),
+    legend.position = "top"
+  )
+
+print(p_volcano)
+
+ggsave(
+  "Volcano_PDHigh_CD4CTL_vs_PD_OtherCD4.png",
+  p_volcano, width = 9, height = 6.2, dpi = 600, bg = "white"
+)
+                     
 if ("cohort" %in% colnames(integrated@meta.data)) {
   print(DimPlot(integrated, reduction="umap", split.by="cohort", ncol=2,
                 label=FALSE, repel=TRUE, pt.size=2.5, cols=pal, raster=TRUE) +
